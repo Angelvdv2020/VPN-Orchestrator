@@ -211,6 +211,7 @@ def _welcome_screen() -> None:
     print("  3. Профиль, подписка и веб-админка")
     print("  4. Проверка DNS, TLS, портов и контейнеров")
     print("  5. Snapshot, rollback и безопасная очистка")
+    print("  6. Полное удаление ORCHESTRATOR и его компонентов")
     print(f"\n{GREEN}Мастер задаст несколько вопросов и выполнит настройку автоматически.{RESET}")
     input(f"\n{DIM}Нажмите Enter, чтобы начать, или Ctrl+C для выхода.{RESET}\n")
 
