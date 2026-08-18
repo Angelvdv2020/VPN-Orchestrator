@@ -4,6 +4,7 @@ import re
 import secrets
 import shutil
 import uuid
+import base64
 from dataclasses import dataclass, asdict
 from typing import Any
 
@@ -40,10 +41,28 @@ def generate_basic() -> tuple[str, str, str]:
 def generate_reality_keypair(runner: ShellRunner, xray_binary: str = "xray") -> tuple[str, str]:
     binary = shutil.which(xray_binary)
     if not binary:
-        raise ManagerError(
-            "Для генерации REALITY keypair нужен xray в PATH. "
-            "Установи Xray-core или передай существующий private key."
+        # Xray stores X25519 keys as unpadded URL-safe base64.  Generate the
+        # same raw 32-byte representation without forcing users to install a
+        # separate CLI binary just to complete first-run setup.
+        try:
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
+        except ImportError as exc:
+            raise ManagerError(
+                "Для автоматической генерации REALITY нужен пакет cryptography. "
+                "Повторите установку Manager или передайте существующий private key."
+            ) from exc
+        private = X25519PrivateKey.generate()
+        encode = lambda value: base64.urlsafe_b64encode(value).decode().rstrip("=")
+        private_raw = private.private_bytes(
+            serialization.Encoding.Raw,
+            serialization.PrivateFormat.Raw,
+            serialization.NoEncryption(),
         )
+        public_raw = private.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        )
+        return encode(private_raw), encode(public_raw)
     result = runner.run([binary, "x25519"])
     text = result.stdout + "\n" + result.stderr
 
