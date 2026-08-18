@@ -60,7 +60,7 @@ VPN Orchestrator помогает установить и управлять с�
 
 ```bash
 git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
-cd hostfront-manager
+cd VPN-Orchestrator
 
 sudo bash install.sh \
   --panel-domain panel.example.com \
@@ -248,7 +248,7 @@ production-схемы. Один европейский сервер и росс�
 
 ```bash
 git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
-cd hostfront-manager
+cd VPN-Orchestrator
 sudo bash install.sh \
   --panel-domain panel.example.com \
   --subscription-domain sub.example.com \
@@ -285,7 +285,7 @@ sudo /opt/hostfront-manager/.venv/bin/hostfront-manager \
   --with-subscription
 ```
 
-## Консольная панель управления HostFront/VPN-инфраструктурой
+## Консольная панель управления VPN Orchestrator
 
 После установки доступна наша интерактивная русская консоль:
 
@@ -364,8 +364,8 @@ hostfront-manager mobile-profile-build \
   --name MOBILE \
   --edge-domain edge.example.com \
   --front-domain front.example.com \
-  --reality-target target.example:443 \
-  --reality-server-name target.example \
+  --reality-target smartcaptcha.cloud.yandex.ru:443 \
+  --reality-server-name smartcaptcha.cloud.yandex.ru \
   --reality-private-key PRIVATE_KEY \
   --short-id 0011223344556677 \
   --hysteria-auth LONG_RANDOM_SECRET \
@@ -466,7 +466,7 @@ Authorization: Bearer HOSTFRONT_ADMIN_TOKEN
 ## Обновление
 
 ```bash
-cd hostfront-manager
+cd VPN-Orchestrator
 git pull --ff-only
 sudo bash install.sh \
   --panel-domain panel.example.com \
@@ -542,7 +542,7 @@ getent ahostsv4 edge.example.com
 
 ```bash
 git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
-cd hostfront-manager
+cd VPN-Orchestrator
 sudo bash install.sh \
   --panel-domain panel.example.com \
   --subscription-domain sub.example.com \
@@ -622,8 +622,8 @@ hostfront-manager mobile-profile-build \
   --name 'Мой мобильный профиль' \
   --edge-domain edge.example.com \
   --front-domain front.example.com \
-  --reality-target target.example:443 \
-  --reality-server-name target.example \
+  --reality-target smartcaptcha.cloud.yandex.ru:443 \
+  --reality-server-name smartcaptcha.cloud.yandex.ru \
   --reality-private-key PRIVATE_KEY \
   --short-id 0011223344556677 \
   --hysteria-auth LONG_RANDOM_SECRET \

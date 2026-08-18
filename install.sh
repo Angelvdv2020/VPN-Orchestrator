@@ -64,6 +64,7 @@ python3 -m venv /opt/hostfront-manager/.venv
 /opt/hostfront-manager/.venv/bin/pip install --upgrade pip
 /opt/hostfront-manager/.venv/bin/pip install "$SOURCE_DIR"
 ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/hostfront-manager
+ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/vpn-orchestrator
 chown -R hostfront-manager:hostfront-manager /opt/hostfront-manager
 chmod 0755 /opt/hostfront-manager /opt/hostfront-manager/.venv /opt/hostfront-manager/.venv/bin/hostfront-manager
 
