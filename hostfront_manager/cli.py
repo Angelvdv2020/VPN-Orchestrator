@@ -42,7 +42,7 @@ from .deploy.deployer import apply_mobile_bundle_v32
 from .deploy.journal import TransactionJournal
 from .deploy.planner import build_deploy_plan
 from .deploy.snapshot import capture_panel_snapshot
-from .deploy.verify import verify_panel_after_apply
+from .deploy.verify import verify_panel_after_apply, verify_rollback_after_apply
 from .remnawave.capabilities import discover_capabilities
 from .rollback.engine import apply_inverse_plan
 from .rollback.models import InverseAction, InverseStep
@@ -956,9 +956,8 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                         tx.path / "rollback-result.json",
                         rollback_result,
                     )
-                    rollback_verify = verify_panel_after_apply(
-                        client,
-                        expected_inbound_tags=[],
+                    rollback_verify = verify_rollback_after_apply(
+                        client, snapshot, applied
                     )
                     journal.write_json(
                         tx.path / "rollback-verify.json",
@@ -1005,7 +1004,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             return ExitCode.OK
 
         except Exception as exc:
-            journal.update_status(tx, "failed", {"error": str(exc)})
+            journal.update_failure(tx, exc)
             raise
 
     if cmd == "transactions":
@@ -1082,7 +1081,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         )
         journal.write_json(tx_path / "rollback-result.json", result)
 
-        verification = verify_panel_after_apply(client, expected_inbound_tags=[])
+        verification = verify_rollback_after_apply(client, before, applied)
         journal.write_json(tx_path / "rollback-verify.json", verification)
         journal.update_status(
             type("Tx", (), {"path": tx_path})(),

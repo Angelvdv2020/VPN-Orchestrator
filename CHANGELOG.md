@@ -5,6 +5,7 @@
 - Remnawave 3.2 capability discovery and transaction deployment.
 - Mobile profile builder for REALITY XHTTP, REALITY RAW, Hysteria2 and HOST-FRONT.
 - Node role assignment and guarded rollback.
+- Snapshot-aware rollback verification with terminal transaction-state preservation.
 - Persistent watchdog with hysteresis, cooldown and repair-loop protection.
 - Signed client telemetry with replay protection and SQLite aggregation.
 - Authenticated web dashboard and administrative read API.

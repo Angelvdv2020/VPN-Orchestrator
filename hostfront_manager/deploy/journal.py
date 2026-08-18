@@ -10,6 +10,16 @@ from pathlib import Path
 from typing import Any
 
 
+TERMINAL_STATUSES = frozenset({
+    "cancelled",
+    "blocked",
+    "committed",
+    "verification_failed",
+    "rolled_back",
+    "rollback_verification_failed",
+})
+
+
 @dataclass(slots=True)
 class Transaction:
     id: str
@@ -68,6 +78,15 @@ class TransactionJournal:
         if extra:
             manifest.update(extra)
         self.write_json(manifest_path, manifest)
+
+    def update_failure(self, tx: Transaction, error: Exception | str) -> bool:
+        """Record an unexpected failure without erasing a more precise terminal state."""
+        manifest_path = tx.path / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("status") in TERMINAL_STATUSES:
+            return False
+        self.update_status(tx, "failed", {"error": str(error)})
+        return True
 
     def list_transactions(self) -> list[Path]:
         root = self._write_root()
