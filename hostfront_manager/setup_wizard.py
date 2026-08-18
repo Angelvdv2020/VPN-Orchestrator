@@ -3,7 +3,6 @@ from __future__ import annotations
 import getpass
 import os
 import re
-import socket
 from pathlib import Path
 
 from .config import AppConfig
@@ -111,8 +110,9 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     edge_node_secret = _ask("Node Secret edge", secret=True)
     front_node_secret = _ask("Node Secret front", secret=True)
 
-    local_ips = {"127.0.0.1", socket.gethostbyname(socket.gethostname())}
-    same_machine = edge_host in local_ips and front_host in local_ips
+    # A single address for both roles is the supported local test mode. In that
+    # mode no private SSH key is required on the Manager host.
+    same_machine = edge_host == front_host
     endpoints = (
         ("edge", edge_host, edge_node_secret),
         ("front", front_host, front_node_secret),
