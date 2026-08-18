@@ -170,11 +170,9 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         print(f"{BLUE}{BOLD}Шаг {step} из 5  {filled:<20}  {step * 20}%{RESET}")
         print(f"\n{BLUE}{BOLD}🌐 {title.upper()}{RESET}\n")
 
-    _banner()
-    print(f"{GREEN}Мастер сам подготовит Manager, ноды, профиль и подписку.{RESET}")
-    input(f"{DIM}Нажмите Enter, чтобы начать…{RESET}")
-
     screen(1, "Домены и название")
+    print(f"{GREEN}Мастер сам подготовит VPN Orchestrator, ноды, профиль и админ-панель.{RESET}")
+    print(f"{DIM}Enter — продолжить, Q — выйти.{RESET}")
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
     admin_domain = _ask("Домен веб-админки", default="admin.example.com")
