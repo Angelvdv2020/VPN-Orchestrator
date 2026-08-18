@@ -80,3 +80,8 @@ def test_host_plan_contains_subscription_overrides():
     assert by_tag["MOBILE-REALITY-XHTTP"]["sni"] == "example.org"
     assert by_tag["MOBILE-HY2"]["securityLayer"] == "TLS"
     assert by_tag["MOBILE-HOST-FRONT"]["path"] == "/edge"
+    host_front = next(
+        item for item in profile.xray_config["inbounds"]
+        if item["tag"] == "MOBILE-HOST-FRONT"
+    )
+    assert host_front["streamSettings"]["xhttpSettings"]["mode"] == "packet-up"

@@ -128,6 +128,7 @@ def _host_front_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
             "security": "none",
             "xhttpSettings": {
                 "path": settings.host_front_path,
+                "mode": "packet-up",
             },
         },
         "sniffing": {
