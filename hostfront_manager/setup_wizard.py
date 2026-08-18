@@ -60,11 +60,17 @@ def _section(number: int, title: str) -> None:
     print(f"\n{BLUE}{BOLD}━━ {number}. {title} ━━{RESET}")
 
 
-def _ask(prompt: str, *, default: str = "", secret: bool = False) -> str:
+def _ask(
+    prompt: str, *, default: str = "", secret: bool = False, required: bool = False
+) -> str:
     suffix = f" {DIM}[по умолчанию: {default}]{RESET}" if default else ""
     print(f"\n{YELLOW}{prompt}{RESET}{suffix}")
-    value = (getpass.getpass if secret else input)(f"{CYAN}  › {RESET}").strip()
-    return value or default
+    while True:
+        value = (getpass.getpass if secret else input)(f"{CYAN}  › {RESET}").strip()
+        value = value or default
+        if value or not required:
+            return value
+        print(f"{YELLOW}  Поле обязательно, введите значение.{RESET}")
 
 
 def _save_secret(path: Path, name: str, value: str) -> None:
@@ -105,8 +111,8 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     hysteria_port = int(_ask("Порт Hysteria2 UDP", default="8445"))
     front_port = int(_ask("Публичный порт front", default="443"))
     _section(2, "Доступ к нодам")
-    edge_host = _ask("IP/hostname edge-сервера", default="203.0.113.11")
-    front_host = _ask("IP/hostname front-сервера", default="203.0.113.12")
+    edge_host = _ask("IP/hostname edge-сервера", required=True)
+    front_host = _ask("IP/hostname front-сервера", required=True)
     edge_node_secret = _ask("Node Secret edge", secret=True)
     front_node_secret = _ask("Node Secret front", secret=True)
 
