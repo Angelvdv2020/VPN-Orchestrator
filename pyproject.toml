@@ -13,6 +13,13 @@ dependencies = [
   "uvicorn>=0.35,<1",
 ]
 
+[project.optional-dependencies]
+test = [
+  "httpx2>=2,<3",
+  "pytest>=8,<10",
+  "ruff>=0.12,<1",
+]
+
 [project.scripts]
 hostfront-manager = "hostfront_manager.cli:entrypoint"
 

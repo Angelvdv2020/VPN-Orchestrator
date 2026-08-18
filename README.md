@@ -113,7 +113,7 @@ reverse proxy and keep the admin token private.
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -e . pytest
+pip install -e '.[test]'
 pytest -q
 shellcheck install.sh
 ```
