@@ -1,0 +1,30 @@
+{
+  "MOBILE-REALITY-XHTTP": {
+    "protocol": "vless",
+    "listen": "0.0.0.0",
+    "port": 443,
+    "transport": "xhttp",
+    "security": "reality"
+  },
+  "MOBILE-REALITY-RAW": {
+    "protocol": "vless",
+    "listen": "0.0.0.0",
+    "port": 8443,
+    "transport": "raw",
+    "security": "reality"
+  },
+  "MOBILE-HY2": {
+    "protocol": "hysteria",
+    "listen": "0.0.0.0",
+    "port": 443,
+    "transport": "hysteria",
+    "security": ""
+  },
+  "MOBILE-HOST-FRONT": {
+    "protocol": "vless",
+    "listen": "127.0.0.1",
+    "port": 9443,
+    "transport": "xhttp",
+    "security": "none"
+  }
+}

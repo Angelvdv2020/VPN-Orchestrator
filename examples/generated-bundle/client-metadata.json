@@ -1,0 +1,47 @@
+{
+  "profile": "MOBILE",
+  "paths": [
+    {
+      "id": "reality-xhttp",
+      "tag": "MOBILE-REALITY-XHTTP",
+      "address": "edge.example.com",
+      "port": 443,
+      "network": "tcp",
+      "transport": "xhttp",
+      "security": "reality",
+      "server_name": "example.org",
+      "short_id": "0011223344556677",
+      "path": "/mobile"
+    },
+    {
+      "id": "reality-raw",
+      "tag": "MOBILE-REALITY-RAW",
+      "address": "edge.example.com",
+      "port": 8443,
+      "network": "tcp",
+      "transport": "raw",
+      "security": "reality",
+      "server_name": "example.org",
+      "short_id": "0011223344556677"
+    },
+    {
+      "id": "hysteria2",
+      "tag": "MOBILE-HY2",
+      "address": "edge.example.com",
+      "port": 443,
+      "network": "udp",
+      "transport": "hysteria",
+      "version": 2
+    },
+    {
+      "id": "host-front",
+      "tag": "MOBILE-HOST-FRONT",
+      "address": "front.example.com",
+      "port": 443,
+      "network": "tcp",
+      "transport": "xhttp",
+      "security": "tls-at-front-proxy",
+      "path": "/edge"
+    }
+  ]
+}

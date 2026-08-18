@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hostfront-manager"
+version = "4.0.0rc1"
+description = "Модульный менеджер инфраструктуры Remnawave/HostFront"
+requires-python = ">=3.11"
+authors = [{name = "HostFront Manager"}]
+dependencies = [
+  "fastapi>=0.116,<1",
+  "uvicorn>=0.35,<1",
+]
+
+[project.scripts]
+hostfront-manager = "hostfront_manager.cli:entrypoint"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hostfront_manager*"]
+
+[tool.setuptools.package-data]
+hostfront_manager = ["web/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

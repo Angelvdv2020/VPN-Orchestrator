@@ -1,0 +1,9 @@
+{
+  "name": "MOBILE-Mobile",
+  "inbound_tags": [
+    "MOBILE-REALITY-XHTTP",
+    "MOBILE-REALITY-RAW",
+    "MOBILE-HY2",
+    "MOBILE-HOST-FRONT"
+  ]
+}

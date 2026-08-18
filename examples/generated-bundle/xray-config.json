@@ -1,0 +1,167 @@
+{
+  "version": {
+    "min": "26.3.27"
+  },
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "MOBILE-REALITY-XHTTP",
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "method": "xhttp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "target": "example.org:443",
+          "xver": 0,
+          "serverNames": [
+            "example.org"
+          ],
+          "privateKey": "PRIVATE_PLACEHOLDER",
+          "minClientVer": "26.3.27",
+          "maxClientVer": "",
+          "maxTimeDiff": 0,
+          "shortIds": [
+            "0011223344556677"
+          ]
+        },
+        "xhttpSettings": {
+          "path": "/mobile"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "MOBILE-REALITY-RAW",
+      "listen": "0.0.0.0",
+      "port": 8443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "method": "raw",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "target": "example.org:443",
+          "xver": 0,
+          "serverNames": [
+            "example.org"
+          ],
+          "privateKey": "PRIVATE_PLACEHOLDER",
+          "minClientVer": "26.3.27",
+          "maxClientVer": "",
+          "maxTimeDiff": 0,
+          "shortIds": [
+            "0011223344556677"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "MOBILE-HY2",
+      "listen": "0.0.0.0",
+      "port": 443,
+      "protocol": "hysteria",
+      "settings": {
+        "version": 2,
+        "users": []
+      },
+      "streamSettings": {
+        "method": "hysteria",
+        "hysteriaSettings": {
+          "version": 2,
+          "auth": "HYSTERIA_PLACEHOLDER_SECRET",
+          "udpIdleTimeout": 60,
+          "masquerade": {
+            "type": "string",
+            "content": "ok",
+            "headers": {
+              "content-type": "text/plain; charset=utf-8"
+            },
+            "statusCode": 200
+          }
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    },
+    {
+      "tag": "MOBILE-HOST-FRONT",
+      "listen": "127.0.0.1",
+      "port": 9443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "method": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "path": "/edge"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "BLOCK",
+      "protocol": "blackhole"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "BLOCK"
+      }
+    ]
+  }
+}

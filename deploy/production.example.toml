@@ -1,0 +1,79 @@
+[manager]
+data_dir = "/var/lib/hostfront-manager"
+log_dir = "/var/log/hostfront-manager"
+backup_dir = "/var/backups/hostfront-manager"
+lock_file = "/run/lock/hostfront-manager.lock"
+command_timeout_seconds = 30
+backup_keep = 20
+secrets_file = "/etc/hostfront-manager/secrets.env"
+
+[remnawave]
+enabled = true
+base_url = "https://panel.example.com"
+token_env = "REMNAWAVE_TOKEN"
+
+[domains]
+panel = "panel.example.com"
+subscription = "sub.example.com"
+
+[checks]
+require_root = true
+require_systemd = true
+require_docker = true
+minimum_free_disk_mb = 4096
+tcp_ports = [22, 80, 443]
+
+[backup]
+paths = ["/opt/remnawave", "/opt/remnanode", "/etc/caddy", "/etc/systemd/system"]
+
+[install]
+panel_dir = "/opt/remnawave"
+node_dir = "/opt/remnanode"
+reverse_proxy = "caddy"
+subscription_bundled = true
+
+[mobile]
+enabled = true
+state_file = "/var/lib/hostfront-manager/mobile-state.json"
+probe_timeout_seconds = 3.0
+failure_penalty = 18
+stale_after_seconds = 900
+prefer_tcp_on_unknown_network = true
+
+[nodes]
+ssh_user = "root"
+ssh_port = 22
+default_node_port = 2222
+enable_net_admin = true
+
+[deploy]
+transaction_dir = "/var/lib/hostfront-manager/transactions"
+require_api_version_prefix = "3.2."
+allow_mutations = false
+health_timeout_seconds = 20
+automatic_rollback = false
+require_verified_rollback_shape = true
+
+[watchdog]
+enabled = true
+state_file = "/var/lib/hostfront-manager/watchdog-state.json"
+interval_seconds = 60
+failure_threshold = 3
+recovery_threshold = 2
+cooldown_seconds = 300
+repair_window_seconds = 3600
+max_repairs_per_window = 3
+auto_repair = false
+unattended_repair = false
+allowed_services = ["docker", "remnawave"]
+
+[web]
+enabled = true
+bind = "127.0.0.1"
+port = 8765
+admin_token_env = "HOSTFRONT_ADMIN_TOKEN"
+telemetry_db = "/var/lib/hostfront-manager/telemetry.sqlite3"
+telemetry_key_prefix = "HOSTFRONT_TELEMETRY_KEY_"
+telemetry_max_clock_skew_seconds = 300
+telemetry_retention_days = 30
+trusted_proxy = false

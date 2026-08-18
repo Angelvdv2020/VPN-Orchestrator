@@ -1,0 +1,6 @@
+https://front.example.com:443 {
+    encode
+    @mobile path /edge*
+    reverse_proxy @mobile 127.0.0.1:9443
+    respond 404
+}

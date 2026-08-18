@@ -1,0 +1,30 @@
+[
+  {
+    "remark": "MOBILE Reality XHTTP",
+    "address": "edge.example.com",
+    "port": 443,
+    "inbound_tag": "MOBILE-REALITY-XHTTP",
+    "network": "tcp"
+  },
+  {
+    "remark": "MOBILE Reality RAW",
+    "address": "edge.example.com",
+    "port": 8443,
+    "inbound_tag": "MOBILE-REALITY-RAW",
+    "network": "tcp"
+  },
+  {
+    "remark": "MOBILE Hysteria2",
+    "address": "edge.example.com",
+    "port": 443,
+    "inbound_tag": "MOBILE-HY2",
+    "network": "udp"
+  },
+  {
+    "remark": "MOBILE Host Front",
+    "address": "front.example.com",
+    "port": 443,
+    "inbound_tag": "MOBILE-HOST-FRONT",
+    "network": "tcp"
+  }
+]

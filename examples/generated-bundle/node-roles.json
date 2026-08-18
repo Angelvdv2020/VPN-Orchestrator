@@ -1,0 +1,17 @@
+{
+  "edge": {
+    "enable_inbounds": [
+      "MOBILE-REALITY-XHTTP",
+      "MOBILE-REALITY-RAW",
+      "MOBILE-HY2"
+    ],
+    "domain": "edge.example.com"
+  },
+  "front": {
+    "enable_inbounds": [
+      "MOBILE-HOST-FRONT"
+    ],
+    "domain": "front.example.com",
+    "notes": "HOST-FRONT рассчитан на отдельный front-node/reverse-proxy или отдельный IP, чтобы внешний TCP/443 не конфликтовал с REALITY."
+  }
+}

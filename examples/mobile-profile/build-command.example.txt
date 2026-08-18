@@ -1,0 +1,11 @@
+hostfront-manager mobile-profile-build \
+  --name MOBILE \
+  --edge-domain edge.example.com \
+  --front-domain front.example.com \
+  --reality-target example.org:443 \
+  --reality-server-name example.org \
+  --reality-private-key 'PRIVATE_KEY' \
+  --short-id '0011223344556677' \
+  --hysteria-auth 'LONG_RANDOM_SECRET' \
+  --output-dir ./mobile-bundle \
+  --validate
