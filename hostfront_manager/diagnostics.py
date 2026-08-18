@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import socket
 from pathlib import Path
@@ -57,6 +58,43 @@ def _check_disk(cfg: AppConfig) -> CheckResult:
         f"свободно {free_mb} MB, требуется минимум {need} MB",
         {"free_mb": free_mb, "minimum_mb": need},
     )
+
+
+def _check_memory() -> CheckResult:
+    try:
+        values = {}
+        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+            key, raw = line.split(":", 1)
+            values[key] = int(raw.strip().split()[0])
+        total = values["MemTotal"]
+        available = values.get("MemAvailable", values.get("MemFree", 0))
+        used_percent = round((1 - available / total) * 100, 1) if total else 100.0
+        ok = used_percent < 95
+        return CheckResult(
+            "memory",
+            ok,
+            f"RAM занято {used_percent}%",
+            {"used_percent": used_percent, "available_mb": available // 1024},
+            critical=False,
+        )
+    except (OSError, KeyError, ValueError) as exc:
+        return CheckResult("memory", False, f"RAM недоступна: {exc}", critical=False)
+
+
+def _check_load() -> CheckResult:
+    try:
+        one, five, fifteen = os.getloadavg()
+        cpus = max(1, os.cpu_count() or 1)
+        ratio = one / cpus
+        return CheckResult(
+            "load",
+            ratio < 2.0,
+            f"load1={one:.2f}, CPU={cpus}",
+            {"load1": one, "load5": five, "load15": fifteen, "cpu_count": cpus},
+            critical=False,
+        )
+    except OSError as exc:
+        return CheckResult("load", False, f"load недоступен: {exc}", critical=False)
 
 
 def _check_dns(name: str, domain: str) -> CheckResult:
@@ -137,6 +175,8 @@ def run_doctor(cfg: AppConfig) -> DoctorReport:
         _check_systemd(cfg),
         _check_docker(cfg),
         _check_disk(cfg),
+        _check_memory(),
+        _check_load(),
         _check_dns("dns:panel", cfg.domains.panel),
         _check_dns("dns:subscription", cfg.domains.subscription),
     ]

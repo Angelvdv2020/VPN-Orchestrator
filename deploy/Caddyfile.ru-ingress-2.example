@@ -1,8 +1,8 @@
-https://app.noryxvpn.store {
+https://app.panel.example.com {
 	reverse_proxy * http://remnawave:3000
 }
 
-https://sub.noryxvpn.store {
+https://sub.panel.example.com {
 	handle_path /__source-key-probe/* {
 		reverse_proxy http://source-key-probe:18081
 	}
@@ -72,7 +72,7 @@ https://sub.noryxvpn.store {
 	}
 }
 
-https://ru2.noryx.ru {
+https://ru-ingress-2.example.com {
 	@mobile path /edge*
 	handle @mobile {
 		reverse_proxy 172.18.0.1:9443 {

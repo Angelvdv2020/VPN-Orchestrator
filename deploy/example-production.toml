@@ -9,12 +9,12 @@ secrets_file = "/etc/hostfront-manager/secrets.env"
 
 [remnawave]
 enabled = true
-base_url = "https://noryx.ru"
+base_url = "https://panel.example.com"
 token_env = "REMNAWAVE_TOKEN"
 
 [domains]
-panel = "noryx.ru"
-subscription = "sub.noryx.ru"
+panel = "panel.example.com"
+subscription = "sub.example.com"
 
 [checks]
 require_root = true

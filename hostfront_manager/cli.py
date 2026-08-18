@@ -59,6 +59,7 @@ from .render import print_json, render_doctor, render_status
 from .rollback.engine import apply_inverse_plan
 from .rollback.planner import build_inverse_plan
 from .security import redact_sensitive
+from .setup_wizard import run_first_run
 from .shell import ShellRunner
 from .state import collect_host_state
 from .telemetry.client import submit as submit_telemetry
@@ -79,6 +80,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status")
     sub.add_parser("doctor")
     sub.add_parser("self-test")
+    fr = sub.add_parser("first-run")
+    fr.add_argument("--no-prompt", action="store_true")
     sub.add_parser("backup")
     sub.add_parser("backups")
     rb = sub.add_parser("rollback")
@@ -616,6 +619,16 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             print(f"Панель: https://{plan.panel_domain}")
             print(f"Subscription Page: {result['subscription']}")
         return ExitCode.OK
+
+    if cmd == "first-run":
+        runner = ShellRunner(
+            logger,
+            timeout=cfg.manager.command_timeout_seconds,
+            dry_run=args.dry_run,
+            secrets=[cfg.remnawave.token() or ""],
+        )
+        result = run_first_run(cfg, runner)
+        return ExitCode.OK if result.get("bundle_dir") else ExitCode.ERROR
 
     if cmd == "mobile-init":
         store = MobileStateStore(cfg.mobile.state_file)

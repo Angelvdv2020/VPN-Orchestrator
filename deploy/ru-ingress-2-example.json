@@ -1,0 +1,12 @@
+{
+  "name": "My-RU-Ingress-2",
+  "address": "203.0.113.13",
+  "port": 2222,
+  "note": "Reserve Russian mobile ingress, ru-ingress-2.example.com",
+  "countryCode": "RU",
+  "tags": ["FRONT", "RU_INGRESS"],
+  "configProfile": {
+    "activeConfigProfileUuid": "REPLACE_WITH_CONFIG_PROFILE_UUID",
+    "activeInbounds": ["REPLACE_WITH_HOST_FRONT_INBOUND_UUID"]
+  }
+}

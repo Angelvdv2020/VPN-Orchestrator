@@ -26,12 +26,12 @@ def test_failure_threshold_and_recovery_hysteresis():
     assert decision.state == "unknown"
     assert not decision.repair_allowed
     decision, state = evaluate(bad, state, cfg, now=101)
-    assert decision.state == "unhealthy"
+    assert decision.state == "down"
     assert decision.repair_allowed
 
     good = [HealthSignal("docker", True, "up")]
     decision, state = evaluate(good, state, cfg, now=102)
-    assert decision.state == "unhealthy"
+    assert decision.state == "recovering"
     decision, state = evaluate(good, state, cfg, now=103)
     assert decision.state == "healthy"
 
@@ -62,3 +62,16 @@ def test_watchdog_config_has_runtime_listener_ports():
     cfg = config(expected_tcp_ports=[443], expected_udp_ports=[443])
     assert cfg.expected_tcp_ports == [443]
     assert cfg.expected_udp_ports == [443]
+
+
+def test_watchdog_records_recovery_state_and_history():
+    cfg = config(failure_threshold=1, recovery_threshold=2)
+    bad = [HealthSignal("docker", False, "down", "docker")]
+    decision, state = evaluate(bad, {}, cfg, now=100)
+    assert decision.state == "down"
+    good = [HealthSignal("docker", True, "up")]
+    decision, state = evaluate(good, state, cfg, now=101)
+    assert decision.state == "recovering"
+    decision, state = evaluate(good, state, cfg, now=102)
+    assert decision.state == "healthy"
+    assert len(state["history"]) == 3

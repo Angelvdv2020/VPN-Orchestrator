@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+import getpass
+import json
+import os
+import re
+from pathlib import Path
+
+from .config import AppConfig
+from .errors import ManagerError
+from .install.wizard import InstallPlan, install_all
+from .mobile.defaults import default_paths
+from .mobile.store import MobileStateStore
+from .nodes.compose import build_node_compose
+from .nodes.models import NodeRuntimeSpec, RemoteTarget
+from .nodes.remote import deploy_compose, remote_prepare, ssh_test
+from .profiles.builder import build_mobile_profile
+from .profiles.bundle import write_bundle
+from .profiles.models import MobileProfileSettings, RealitySettings
+from .shell import ShellRunner
+
+
+def _ask(prompt: str, *, default: str = "", secret: bool = False) -> str:
+    suffix = f" [{default}]" if default else ""
+    value = (getpass.getpass if secret else input)(f"{prompt}{suffix}: ").strip()
+    return value or default
+
+
+def _save_secret(path: Path, name: str, value: str) -> None:
+    if not value or any(x in value for x in "\r\n"):
+        raise ManagerError(f"Пустой или небезопасный секрет: {name}")
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    result = [line for line in lines if not line.startswith(name + "=")]
+    result.append(f"{name}={value}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    from .install.common import atomic_write
+
+    atomic_write(path, "\n".join(result) + "\n", 0o600)
+
+
+def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
+    """Interactive setup that gathers user data once and runs supported steps."""
+    print("=== HostFront Manager — мастер первого запуска ===")
+    print("Все названия, домены и адреса ниже принадлежат вам и сохраняются в bundle.")
+    panel = _ask("Домен панели", default="panel.example.com")
+    subscription = _ask("Домен подписки", default="sub.example.com")
+    profile_name = _ask("Название профиля и подписки", default="Мой мобильный профиль")
+    edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
+    front_domain = _ask("Домен front-ноды", default="front.example.com")
+    edge_host = _ask("IP/hostname edge-сервера", default="203.0.113.11")
+    front_host = _ask("IP/hostname front-сервера", default="203.0.113.12")
+    ssh_user = _ask("SSH user для нод", default="root")
+    ssh_port = int(_ask("SSH port для нод", default="22"))
+    identity = _ask("Путь к SSH private key", default="/root/.ssh/hostfront-edge")
+    edge_node_secret = _ask("Node Secret edge", secret=True)
+    front_node_secret = _ask("Node Secret front", secret=True)
+
+    for role, host, secret in (
+        ("edge", edge_host, edge_node_secret),
+        ("front", front_host, front_node_secret),
+    ):
+        target = RemoteTarget(host, ssh_user, ssh_port, identity)
+        ssh_test(runner, target)
+        remote_prepare(runner, target)
+        compose = build_node_compose(
+            NodeRuntimeSpec(
+                node_port=cfg.nodes.default_node_port,
+                secret_key=secret,
+                enable_net_admin=cfg.nodes.enable_net_admin,
+            )
+        )
+        deploy_compose(runner, target, compose, start=True)
+        print(f"Нода {role} подготовлена: {host}")
+
+    print("\nВведите параметры REALITY и Hysteria2 (они не выводятся на экран):")
+    reality_target = _ask("REALITY target host:port", default="target.example:443")
+    reality_sni = _ask("REALITY SNI", default="target.example")
+    reality_private_key = _ask("REALITY private key", secret=True)
+    short_id = _ask("REALITY short ID")
+    hysteria_auth = _ask("Hysteria2 auth", secret=True)
+
+    plan = InstallPlan(panel, subscription, True)
+    installation = install_all(cfg, runner, plan)
+
+    token = _ask("Remnawave API token", secret=True)
+    _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
+    os.environ[cfg.remnawave.token_env] = token
+    installation = install_all(cfg, runner, plan)
+
+    settings = MobileProfileSettings(
+        name=profile_name,
+        edge_domain=edge_domain,
+        front_domain=front_domain,
+        reality=RealitySettings(
+            target=reality_target,
+            server_name=reality_sni,
+            private_key=reality_private_key,
+            short_id=short_id,
+        ),
+        hysteria_auth=hysteria_auth,
+    )
+    profile = build_mobile_profile(settings)
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", profile_name).strip(".-") or "mobile"
+    output_dir = cfg.manager.data_dir / "bundles" / safe_name
+    files = write_bundle(profile, output_dir)
+    MobileStateStore(cfg.mobile.state_file).set_paths(
+        default_paths(edge_domain, front_domain)
+    )
+    result = {
+        "installation": installation,
+        "profile_name": profile_name,
+        "bundle_dir": str(output_dir),
+        "files": [str(x) for x in files],
+        "next": "Проверьте bundle и выполните deploy-mobile-plan перед apply.",
+    }
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return result

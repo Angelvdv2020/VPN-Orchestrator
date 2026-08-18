@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from ..config import WatchdogSection
@@ -8,7 +8,7 @@ from .models import HealthSignal, WatchdogDecision
 
 
 def utc_timestamp() -> float:
-    return datetime.now(timezone.utc).timestamp()
+    return datetime.now(UTC).timestamp()
 
 
 def evaluate(
@@ -20,23 +20,30 @@ def evaluate(
 ) -> tuple[WatchdogDecision, dict[str, Any]]:
     now = utc_timestamp() if now is None else now
     healthy = all(x.ok for x in signals)
+    critical_failure = any(not x.ok and x.critical for x in signals)
     failures = 0 if healthy else int(state.get("failure_streak", 0)) + 1
     recoveries = int(state.get("recovery_streak", 0)) + 1 if healthy else 0
     previous = str(state.get("state", "unknown"))
 
     current = previous
     if not healthy and failures >= cfg.failure_threshold:
-        current = "unhealthy"
-    elif healthy and (previous != "unhealthy" or recoveries >= cfg.recovery_threshold):
-        current = "healthy"
+        current = "down" if critical_failure else "degraded"
+    elif healthy and previous in {"down", "degraded", "recovering", "unhealthy"}:
+        current = "healthy" if recoveries >= cfg.recovery_threshold else "recovering"
+    elif not healthy:
+        current = previous
 
     cutoff = now - cfg.repair_window_seconds
-    history = [float(x) for x in state.get("repair_timestamps", []) if float(x) >= cutoff]
+    history = [
+        float(x) for x in state.get("repair_timestamps", []) if float(x) >= cutoff
+    ]
     last = state.get("last_repair_at")
     cooldown_ok = last is None or now - float(last) >= cfg.cooldown_seconds
     budget_ok = len(history) < cfg.max_repairs_per_window
-    services = sorted({x.repair_service for x in signals if not x.ok and x.repair_service})
-    threshold_met = current == "unhealthy"
+    services = sorted(
+        {x.repair_service for x in signals if not x.ok and x.repair_service}
+    )
+    threshold_met = current in {"down", "degraded"}
     repair_allowed = bool(services and threshold_met and cooldown_ok and budget_ok)
 
     if not threshold_met:
@@ -51,18 +58,34 @@ def evaluate(
         reason = "repair may run"
 
     updated = dict(state)
-    updated.update({
-        "state": current,
-        "failure_streak": failures,
-        "recovery_streak": recoveries,
-        "repair_timestamps": history,
-        "last_check_at": now,
-        "last_signals": [x.to_dict() for x in signals],
-    })
+    events = list(updated.get("history", []))[-999:]
+    events.append(
+        {
+            "at": now,
+            "state": current,
+            "healthy": healthy,
+            "signals": [x.to_dict() for x in signals],
+        }
+    )
+    updated.update(
+        {
+            "state": current,
+            "failure_streak": failures,
+            "recovery_streak": recoveries,
+            "repair_timestamps": history,
+            "last_check_at": now,
+            "last_signals": [x.to_dict() for x in signals],
+            "history": events,
+        }
+    )
     return WatchdogDecision(
-        healthy=healthy, state=current, failure_streak=failures,
-        recovery_streak=recoveries, repair_services=services,
-        repair_allowed=repair_allowed, reason=reason,
+        healthy=healthy,
+        state=current,
+        failure_streak=failures,
+        recovery_streak=recoveries,
+        repair_services=services,
+        repair_allowed=repair_allowed,
+        reason=reason,
     ), updated
 
 

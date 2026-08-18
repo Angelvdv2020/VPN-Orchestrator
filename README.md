@@ -54,9 +54,9 @@ HostFront Manager помогает установить и управлять с
 🌍 Сервер 2: VPN-нода
 ```
 
-### Установка
+### Установка одной командой
 
-На основном сервере выполните:
+На основном сервере выполните одну команду:
 
 ```bash
 git clone https://github.com/Angelvdv2020/hostfront-manager.git
@@ -67,6 +67,17 @@ sudo bash install.sh \
   --subscription-domain sub.example.com \
   --source "$PWD"
 ```
+
+После установки запустите мастер:
+
+```bash
+sudo hostfront-manager first-run
+```
+
+Мастер последовательно спросит ваши домены, название подписки, адреса и SSH-доступ
+к edge/front, ключи REALITY/Hysteria2 и Node Secret. Затем сам установит компоненты,
+подготовит обе ноды, соберёт подписку и сохранит bundle. Вводимые значения не
+заменяются на имена проекта или чужие домены.
 
 Замените `panel.example.com` и `sub.example.com` на свои домены. После установки
 откройте Remnawave и создайте первого администратора.
@@ -157,9 +168,8 @@ sudo hostfront-manager self-test
 личные ссылки подписки и Admin Token. Не публикуйте их в GitHub, чатах и скриншотах.
 
 Для новичка порядок действий простой: подготовить сервер и домены, запустить
-`install.sh`, создать администратора Remnawave, открыть `hostfront-manager`,
-добавить ноду, создать профиль, выполнить `self-test`, проверить подключение и
-сделать backup.
+`install.sh`, затем один раз пройти `hostfront-manager first-run`, выполнить
+`self-test`, проверить подключение и сделать backup.
 
 ## Архитектура
 
@@ -185,25 +195,25 @@ production-схемы. Один европейский сервер и росс�
 Доступность конкретного российского IP всё равно проверяется у нужного оператора
 во время реального ограничения.
 
-### Российские ingress-ноды Noryx
+### Российские ingress-ноды HostFront
 
 В рабочем развёртывании используются два отдельных входа одного провайдера
-Beget (`AS198610`):
+Beget (`example-provider`):
 
-- `ru.noryx.ru` → `95.214.63.141`, Nginx → `172.18.0.1:9443`;
-- `ru2.noryx.ru` → `159.194.220.63`, Caddy → `172.18.0.1:9443`.
+- `ru-ingress.example.com` → `203.0.113.12`, Nginx → `172.18.0.1:9443`;
+- `ru-ingress-2.example.com` → `203.0.113.13`, Caddy → `172.18.0.1:9443`.
 
 Обе ноды запускают только inbound `MOBILE-HOST-FRONT`. Они не занимают
 публичный порт 443 отдельным процессом и не конфликтуют с существующими
 сайтами/VPN: TLS завершается в уже установленном reverse proxy. Node API на
-TCP 2222 разрешён firewall только для IP панели `217.60.2.61`.
+TCP 2222 разрешён firewall только для IP панели `203.0.113.10`.
 
-Готовые файлы развёртывания находятся в `deploy/noryx-ru-node.json`,
-`deploy/noryx-ru2-node.json`, `deploy/nginx-ru.noryx.ru.conf` и
-`deploy/Caddyfile.ru2`. Перед заменой reverse-proxy конфигурации обязательно
+Шаблоны развёртывания находятся в `deploy/ru-ingress-example.json`,
+`deploy/ru-ingress-2-example.json`, `deploy/nginx-ru-ingress.example.conf` и
+`deploy/Caddyfile.ru-ingress-2.example`. Перед заменой reverse-proxy конфигурации обязательно
 создайте архив, выполните `nginx -t` или `caddy validate`, и только после этого
-делайте reload. В подписке эти пути отображаются как `🇷🇺 Vortex RU-INGRESS` и
-`🇷🇺 Vortex RU-INGRESS 2`.
+делайте reload. Имена нод и отображаемые имена путей в этих шаблонах замените на
+свои перед применением.
 
 Клиент получает несколько путей подключения. Телеметрия сообщает Manager, какой
 путь действительно работает у конкретного оператора, а механизм рекомендаций
@@ -585,7 +595,7 @@ sudo hostfront-manager node-remote-health \
 
 Edge должна слушать TCP/UDP 443, TCP 8443 и Node API 2222.
 
-### 5. Мобильный профиль Vortex
+### 5. Мобильный профиль HostFront
 
 Сначала сгенерируйте секреты, затем создайте bundle:
 
@@ -593,7 +603,7 @@ Edge должна слушать TCP/UDP 443, TCP 8443 и Node API 2222.
 hostfront-manager profile-generate-secrets --with-reality
 
 hostfront-manager mobile-profile-build \
-  --name '🇪🇺 Vortex' \
+  --name 'Мой мобильный профиль' \
   --edge-domain edge.example.com \
   --front-domain front.example.com \
   --reality-target target.example:443 \
@@ -617,12 +627,13 @@ sudo hostfront-manager deploy-mobile-apply --yes ./mobile-bundle
 установлен, команда завершается ошибкой, а не сообщает об успешной полной
 валидации после одной структурной проверки.
 
-Рекомендуемые отображаемые имена Hosts:
+Имена Hosts и путей автоматически строятся из значения `--name`; пользователь
+может задать любое своё название прямо в мастере первого запуска. Например:
 
-- `🇪🇺 Vortex REALITY XHTTP`;
-- `🇪🇺 Vortex REALITY RAW`;
-- `🇪🇺 Vortex Hysteria2`;
-- `🇪🇺 Vortex HOST-FRONT`.
+- `Мой мобильный профиль Reality XHTTP`;
+- `Мой мобильный профиль Reality RAW`;
+- `Мой мобильный профиль Hysteria2`;
+- `Мой мобильный профиль Host Front`.
 
 Флаг является частью названия и сам по себе не меняет геолокацию IP.
 
@@ -705,7 +716,7 @@ Remnawave-токен. Обновите страницу и используйт�
 1. Создайте активного пользователя Remnawave и назначьте мобильный Squad.
 2. Скопируйте его персональный URL `https://sub.example.com/<token>`.
 3. В HAPP добавьте подписку по URL и выполните обновление.
-4. Должны появиться четыре подключения `Vortex`.
+4. Должны появиться четыре подключения `Mobile`.
 5. Тестируйте их отдельно: REALITY RAW, REALITY XHTTP, Hysteria2, HOST-FRONT.
 6. После переименования Hosts обновите подписку. Если HAPP держит старый кэш,
    удалите подписку и добавьте снова.

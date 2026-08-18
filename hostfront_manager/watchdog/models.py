@@ -11,6 +11,7 @@ class HealthSignal:
     summary: str
     repair_service: str | None = None
     details: dict[str, Any] = field(default_factory=dict)
+    critical: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
