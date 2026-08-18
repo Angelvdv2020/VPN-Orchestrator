@@ -213,7 +213,7 @@ production-схемы. Один европейский сервер и росс�
 Доступность конкретного российского IP всё равно проверяется у нужного оператора
 во время реального ограничения.
 
-### Российские ingress-ноды HostFront
+### Российские ingress-ноды VPN Orchestrator
 
 В рабочем развёртывании используются два отдельных входа одного провайдера
 Beget (`example-provider`):
@@ -512,7 +512,7 @@ Manager → Remnawave API → Config Profiles / Hosts / Squads / Nodes
 Telemetry client → Manager API → оценка путей → рекомендация транспорта
 ```
 
-Manager/front содержит панель Remnawave, страницу подписок, Caddy, HostFront
+Manager/front содержит панель Remnawave, страницу подписок, Caddy, VPN Orchestrator
 Manager и локальную front-ноду. Edge обслуживает REALITY и Hysteria2.
 HOST-FRONT — отдельный резервный транспорт, а не название всей VPN.
 
@@ -613,7 +613,7 @@ sudo hostfront-manager node-remote-health \
 
 Edge должна слушать TCP/UDP 443, TCP 8443 и Node API 2222.
 
-### 5. Мобильный профиль HostFront
+### 5. Мобильный профиль VPN Orchestrator
 
 Сначала сгенерируйте секреты, затем создайте bundle:
 

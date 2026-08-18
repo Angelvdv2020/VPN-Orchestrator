@@ -6,7 +6,7 @@ PANEL_DOMAIN=""
 SUBSCRIPTION_DOMAIN=""
 SOURCE_DIR=""
 INSTALL_PANEL=1
-HOSTFRONT_REF="${HOSTFRONT_REF:-v4.0.0-rc.3}"
+ORCHESTRATOR_REF="${ORCHESTRATOR_REF:-${HOSTFRONT_REF:-v4.0.0-rc.3}}"
 
 usage() {
   echo "Usage: sudo bash install.sh --panel-domain panel.example.com --subscription-domain sub.example.com [--source DIR] [--manager-only]"
@@ -40,7 +40,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ca-certificates curl python3 python3-venv
 
-work_dir=$(mktemp -d /tmp/hostfront-install.XXXXXX)
+work_dir=$(mktemp -d /tmp/vpn-orchestrator-install.XXXXXX)
 cleanup() { rm -rf -- "$work_dir"; }
 trap cleanup EXIT
 
@@ -48,7 +48,7 @@ if [[ -n "$SOURCE_DIR" ]]; then
   [[ -f "$SOURCE_DIR/pyproject.toml" ]] || { echo "Invalid --source" >&2; exit 2; }
 else
   curl -fL --retry 3 \
-    "https://github.com/Angelvdv2020/VPN-Orchestrator/archive/refs/tags/${HOSTFRONT_REF}.tar.gz" \
+    "https://github.com/Angelvdv2020/VPN-Orchestrator/archive/refs/tags/${ORCHESTRATOR_REF}.tar.gz" \
     -o "$work_dir/source.tar.gz"
   tar -xzf "$work_dir/source.tar.gz" -C "$work_dir"
   SOURCE_DIR=$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d -name 'VPN-Orchestrator-*' -print -quit)

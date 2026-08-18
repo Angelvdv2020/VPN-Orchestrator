@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .. import __version__
@@ -207,5 +207,9 @@ def create_app(cfg: AppConfig) -> FastAPI:
     def dashboard():
         path = Path(__file__).with_name("dashboard.html")
         return HTMLResponse(path.read_text(encoding="utf-8"))
+
+    @app.get("/assets/vpn-orchestrator-logo.png")
+    def logo():
+        return FileResponse(Path(__file__).with_name("assets") / "vpn-orchestrator-logo.png")
 
     return app
