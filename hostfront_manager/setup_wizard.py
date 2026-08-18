@@ -201,6 +201,20 @@ def _orchestrator_art() -> None:
     print(f"{RESET}")
 
 
+def _welcome_screen() -> None:
+    """Branded welcome page shown before the questionnaire starts."""
+    _clear_screen()
+    _orchestrator_art()
+    print(f"{CYAN}{BOLD}=== ORCHESTRATOR — ПЕРВЫЙ ЗАПУСК ==={RESET}")
+    print("  1. Установка и восстановление VPN-инфраструктуры")
+    print("  2. EDGE / FRONT и мобильные транспорты")
+    print("  3. Профиль, подписка и веб-админка")
+    print("  4. Проверка DNS, TLS, портов и контейнеров")
+    print("  5. Snapshot, rollback и безопасная очистка")
+    print(f"\n{GREEN}Мастер задаст несколько вопросов и выполнит настройку автоматически.{RESET}")
+    input(f"\n{DIM}Нажмите Enter, чтобы начать, или Ctrl+C для выхода.{RESET}\n")
+
+
 def _initial_backup(cfg: AppConfig):
     """Create a backup when an existing installation has data to preserve."""
     if not any(path.exists() for path in cfg.backup.paths):
@@ -243,6 +257,12 @@ def _deploy_local_node(cfg: AppConfig, runner: ShellRunner, compose: str) -> Non
 
 def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     """Five-step product-style first-run wizard with compact output."""
+    _welcome_screen()
+
+    def install_progress(label: str, state: str) -> None:
+        marker = "✅" if state == "done" else "⏳"
+        _stage(label, marker)
+
     def screen(step: int, title: str) -> None:
         _clear_screen()
         _orchestrator_art()
@@ -371,7 +391,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         "первичная установка Remnawave Panel",
         lambda: _run_with_progress(
             "установка Remnawave Panel и запуск Docker-контейнеров",
-            lambda: install_all(cfg, runner, bootstrap_plan),
+            lambda: install_all(cfg, runner, bootstrap_plan, progress=install_progress),
         ),
     )
     screen(4, "Доступ Remnawave")
@@ -450,7 +470,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         "установка компонентов",
         lambda: _run_with_progress(
             "загрузка образов, настройка Remnawave и веб-админки",
-            lambda: install_all(cfg, runner, plan),
+            lambda: install_all(cfg, runner, plan, progress=install_progress),
         ),
     )
     _stage("Настройка Remnawave, профиля и веб-админки", "✅")

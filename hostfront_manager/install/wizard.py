@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 
 from ..config import AppConfig
 from ..shell import ShellRunner
@@ -29,7 +30,16 @@ def interactive_plan() -> InstallPlan:
     return InstallPlan(panel, sub, install_sub)
 
 
-def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
+def install_all(
+    cfg: AppConfig,
+    runner: ShellRunner,
+    plan: InstallPlan,
+    progress: Callable[[str, str], None] | None = None,
+) -> dict:
+    def mark(label: str, state: str) -> None:
+        if progress:
+            progress(label, state)
+
     panel_ips = resolve_domain(plan.panel_domain)
     sub_ips = resolve_domain(plan.subscription_domain)
 
@@ -38,22 +48,27 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
     if plan.subscription_domain != plan.panel_domain and not sub_ips:
         runner.logger.warning("DNS Subscription Page пока не резолвится: %s", plan.subscription_domain)
 
+    mark("Установка Remnawave Panel", "start")
     panel = install_panel(
         cfg,
         runner,
         panel_domain=plan.panel_domain,
         subscription_domain=plan.subscription_domain,
     )
+    mark("Установка Remnawave Panel", "done")
 
     subscription_status = "skipped"
     token = cfg.remnawave.token()
     admin_dir = None
     if plan.install_admin and plan.admin_domain and token:
+        mark("Настройка веб-админки", "start")
         admin_dir = install_remnawave_admin(
             cfg, runner, admin_domain=plan.admin_domain, panel_domain=plan.panel_domain
         )
+        mark("Настройка веб-админки", "done")
 
     if plan.install_subscription and token:
+        mark("Создание Subscription Page", "start")
         install_subscription_page(
             cfg,
             runner,
@@ -61,10 +76,12 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
             api_token=token,
         )
         subscription_status = "installed"
+        mark("Создание Subscription Page", "done")
     elif plan.install_subscription:
         subscription_status = "waiting_for_api_token"
         runner.logger.warning("Subscription Page отложена: нет %s", cfg.remnawave.token_env)
 
+    mark("Настройка reverse proxy и TLS", "start")
     install_caddy(
         cfg,
         runner,
@@ -72,6 +89,7 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
         subscription_domain=plan.subscription_domain if subscription_status == "installed" else None,
         admin_domain=plan.admin_domain if plan.install_admin else None,
     )
+    mark("Настройка reverse proxy и TLS", "done")
 
     return {
         "panel": {
