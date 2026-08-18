@@ -177,6 +177,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     screen(1, "Домены и название")
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
+    admin_domain = _ask("Домен веб-админки", default="admin.example.com")
     profile_name = _ask("Название профиля", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
@@ -244,7 +245,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     print(f"{GREEN}✓ Токен принят и будет сохранён защищённо{RESET}")
 
     screen(5, "Проверка настроек")
-    print(f"Панель:       {panel}\nПодписка:     {subscription}")
+    print(f"Панель:       {panel}\nПодписка:     {subscription}\nАдминка:      {admin_domain}")
     print(f"EDGE:         {edge_host} ({edge_domain})\nFRONT:        {front_host} ({front_domain})")
     print("\nПодключения:  ✅ REALITY XHTTP  ✅ REALITY RAW  ✅ Hysteria2  ✅ HOST-FRONT")
     print(f"Порты:        {xhttp_port}, {raw_port}, {hysteria_port}, {front_port}")
@@ -254,7 +255,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
-    print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА HOSTFRONT{RESET}\n")
+    print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА VPN ORCHESTRATOR{RESET}\n")
     _stage("Проверка системы", "✅")
     _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
     _stage("Проверка портов", "✅")
@@ -286,7 +287,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         _retry_step(f"настройка {role.upper()}", deploy_one)
         _stage(f"Настройка {role.upper()}", "✅")
 
-    plan = InstallPlan(panel, subscription, True)
+    plan = InstallPlan(panel, subscription, True, admin_domain=admin_domain)
     _stage("Настройка Remnawave", "✅")
     installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
     _stage("Установка Manager", "✅")

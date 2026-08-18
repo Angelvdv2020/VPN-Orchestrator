@@ -7,6 +7,7 @@ from ..shell import ShellRunner
 from .caddy import install_caddy
 from .common import resolve_domain, validate_domain
 from .panel import install_panel
+from .remnawave_admin import install_remnawave_admin
 from .subscription import install_subscription_page
 
 
@@ -15,6 +16,7 @@ class InstallPlan:
     panel_domain: str
     subscription_domain: str
     install_subscription: bool
+    admin_domain: str | None = None
 
 
 def interactive_plan() -> InstallPlan:
@@ -44,6 +46,11 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
 
     subscription_status = "skipped"
     token = cfg.remnawave.token()
+    admin_dir = None
+    if plan.admin_domain and token:
+        admin_dir = install_remnawave_admin(
+            cfg, runner, admin_domain=plan.admin_domain, panel_domain=plan.panel_domain
+        )
 
     if plan.install_subscription and token:
         install_subscription_page(
@@ -62,6 +69,7 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
         runner,
         panel_domain=plan.panel_domain,
         subscription_domain=plan.subscription_domain if subscription_status == "installed" else None,
+        admin_domain=plan.admin_domain,
     )
 
     return {
@@ -70,6 +78,7 @@ def install_all(cfg: AppConfig, runner: ShellRunner, plan: InstallPlan) -> dict:
             "panel_domain": panel.panel_domain,
             "subscription_domain": panel.subscription_domain,
             "created": panel.created,
+            "admin_dir": admin_dir,
         },
         "subscription": subscription_status,
         "dns": {"panel": panel_ips, "subscription": sub_ips},

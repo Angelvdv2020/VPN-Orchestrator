@@ -33,7 +33,7 @@ volumes:
 """
 
 
-def build_caddyfile(panel_domain: str, subscription_domain: str | None = None) -> str:
+def build_caddyfile(panel_domain: str, subscription_domain: str | None = None, admin_domain: str | None = None) -> str:
     panel_domain = validate_domain(panel_domain)
     blocks = [
         f"""https://{panel_domain} {{
@@ -56,6 +56,12 @@ def build_caddyfile(panel_domain: str, subscription_domain: str | None = None) -
     }}
 }}"""
         )
+    if admin_domain and admin_domain not in {panel_domain, subscription_domain}:
+        admin_domain = validate_domain(admin_domain)
+        blocks.append(f"""https://{admin_domain} {{
+    encode
+    reverse_proxy * http://remnawave-web-frontend:80
+}}""")
     blocks.append(""":443 {
     tls internal
     respond 204
@@ -69,6 +75,7 @@ def install_caddy(
     *,
     panel_domain: str,
     subscription_domain: str | None = None,
+    admin_domain: str | None = None,
     start: bool = True,
 ) -> Path:
     require_root()
@@ -78,7 +85,7 @@ def install_caddy(
         return caddy_dir
 
     caddy_dir.mkdir(parents=True, exist_ok=True)
-    atomic_write(caddy_dir / "Caddyfile", build_caddyfile(panel_domain, subscription_domain), 0o644)
+    atomic_write(caddy_dir / "Caddyfile", build_caddyfile(panel_domain, subscription_domain, admin_domain), 0o644)
     atomic_write(caddy_dir / "docker-compose.yml", CADDY_COMPOSE, 0o644)
     runner.run(["docker", "compose", "-f", str(caddy_dir / "docker-compose.yml"), "config", "-q"])
     if start:
