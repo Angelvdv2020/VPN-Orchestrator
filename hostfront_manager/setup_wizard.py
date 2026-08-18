@@ -5,6 +5,8 @@ import os
 import re
 import secrets
 import socket
+import shutil
+import subprocess
 from pathlib import Path
 
 from .config import AppConfig
@@ -129,6 +131,15 @@ def _stage(label: str, state: str = "⏳") -> None:
     print(f"{state} {label}")
 
 
+def _clear_screen() -> None:
+    """Clear real terminals and remain usable in minimal SSH/CI sessions."""
+    if os.environ.get("TERM") and shutil.which("clear"):
+        result = subprocess.run(["clear"], check=False, capture_output=True, text=True)
+        if result.returncode == 0:
+            return
+    print("\033[2J\033[H", end="", flush=True)
+
+
 def _initial_backup(cfg: AppConfig):
     """Create a backup when an existing installation has data to preserve."""
     if not any(path.exists() for path in cfg.backup.paths):
@@ -161,7 +172,7 @@ def _deploy_local_node(cfg: AppConfig, runner: ShellRunner, compose: str) -> Non
 def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     """Five-step product-style first-run wizard with compact output."""
     def screen(step: int, title: str) -> None:
-        print("\033[2J\033[H", end="")
+        _clear_screen()
         print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════╗{RESET}")
         print(f"{CYAN}{BOLD}║                  ORCHESTRATOR RC3                 ║{RESET}")
         print(f"{CYAN}{BOLD}║                Мастер первого запуска               ║{RESET}")
