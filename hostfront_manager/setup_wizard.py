@@ -90,6 +90,10 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     profile_name = _ask("Название профиля и подписки", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
+    xhttp_port = int(_ask("Порт REALITY XHTTP", default="8443"))
+    raw_port = int(_ask("Порт REALITY RAW", default="8444"))
+    hysteria_port = int(_ask("Порт Hysteria2 UDP", default="8445"))
+    front_port = int(_ask("Публичный порт front", default="443"))
     _section(2, "Доступ к нодам")
     edge_host = _ask("IP/hostname edge-сервера", default="203.0.113.11")
     front_host = _ask("IP/hostname front-сервера", default="203.0.113.12")
@@ -99,10 +103,17 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     edge_node_secret = _ask("Node Secret edge", secret=True)
     front_node_secret = _ask("Node Secret front", secret=True)
 
-    for role, host, secret in (
+    endpoints = (
         ("edge", edge_host, edge_node_secret),
         ("front", front_host, front_node_secret),
-    ):
+    )
+    if edge_host == front_host:
+        print(
+            f"{YELLOW}Одна машина указана для edge и front; SSH-развёртывание "
+            "ноды выполняется один раз после настройки портов.{RESET}"
+        )
+        endpoints = (endpoints[0],)
+    for role, host, secret in endpoints:
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
         ssh_test(runner, target)
         remote_prepare(runner, target)
@@ -144,6 +155,10 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             private_key=reality_private_key,
             short_id=short_id,
         ),
+        reality_xhttp_port=xhttp_port,
+        reality_raw_port=raw_port,
+        hysteria_port=hysteria_port,
+        host_front_external_port=front_port,
         hysteria_auth=hysteria_auth,
     )
     profile = build_mobile_profile(settings)
