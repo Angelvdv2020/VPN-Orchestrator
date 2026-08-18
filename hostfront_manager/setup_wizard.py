@@ -261,7 +261,16 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         short_id = _ask("REALITY short ID", required=True)
         hysteria_auth = _ask("Hysteria2 auth", secret=True, required=True)
 
+    # The panel must exist before an API token can be created.  Bootstrap only
+    # the panel/Caddy here; subscription and Remnawave Admin wait for the token.
+    bootstrap_plan = InstallPlan(panel, subscription, False)
+    _retry_step(
+        "первичная установка Remnawave Panel",
+        lambda: install_all(cfg, runner, bootstrap_plan),
+    )
     screen(4, "Доступ Remnawave")
+    print(f"{GREEN}Панель установлена: https://{panel}{RESET}")
+    print(f"{DIM}Откройте её, создайте администратора и API token, затем вставьте token ниже.{RESET}")
     token = _ask("Remnawave API token", secret=True, required=True)
     print(f"{GREEN}✓ Токен принят и будет сохранён защищённо{RESET}")
 
