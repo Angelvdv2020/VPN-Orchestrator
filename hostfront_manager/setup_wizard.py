@@ -16,6 +16,7 @@ from .nodes.models import NodeRuntimeSpec, RemoteTarget
 from .nodes.remote import deploy_compose, remote_prepare, ssh_test
 from .profiles.builder import build_mobile_profile
 from .profiles.bundle import write_bundle
+from .profiles.keys import generate_basic, generate_reality_keypair
 from .profiles.models import MobileProfileSettings, RealitySettings
 from .shell import ShellRunner
 
@@ -200,9 +201,18 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         "REALITY target host:port", default="smartcaptcha.cloud.yandex.ru:443"
     )
     reality_sni = _ask("REALITY SNI", default="smartcaptcha.cloud.yandex.ru")
-    reality_private_key = _ask("REALITY private key", secret=True)
-    short_id = _ask("REALITY short ID")
-    hysteria_auth = _ask("Hysteria2 auth", secret=True)
+    print(f"{DIM}Генерирую REALITY keypair, short ID и Hysteria2 auth автоматически…{RESET}")
+    try:
+        reality_private_key, _reality_public_key = generate_reality_keypair(runner)
+        _generated_uuid, short_id, hysteria_auth = generate_basic()
+        print(f"{GREEN}✓ Ключи транспортов сгенерированы автоматически.{RESET}")
+    except ManagerError as exc:
+        print(f"{YELLOW}Не удалось автоматически создать REALITY keypair: {exc}{RESET}")
+        reality_private_key = _ask(
+            "REALITY private key (вставьте существующий ключ)", secret=True, required=True
+        )
+        short_id = _ask("REALITY short ID", required=True)
+        hysteria_auth = _ask("Hysteria2 auth", secret=True, required=True)
 
     plan = InstallPlan(panel, subscription, True)
     installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
