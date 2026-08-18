@@ -196,8 +196,10 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     _section(3, "Ключи транспортов")
     print(f"{DIM}Секретные поля вводятся вслепую и не попадают в журнал.{RESET}")
-    reality_target = _ask("REALITY target host:port", default="target.example:443")
-    reality_sni = _ask("REALITY SNI", default="target.example")
+    reality_target = _ask(
+        "REALITY target host:port", default="smartcaptcha.cloud.yandex.ru:443"
+    )
+    reality_sni = _ask("REALITY SNI", default="smartcaptcha.cloud.yandex.ru")
     reality_private_key = _ask("REALITY private key", secret=True)
     short_id = _ask("REALITY short ID")
     hysteria_auth = _ask("Hysteria2 auth", secret=True)
