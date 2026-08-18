@@ -212,4 +212,8 @@ def create_app(cfg: AppConfig) -> FastAPI:
     def logo():
         return FileResponse(Path(__file__).with_name("assets") / "vpn-orchestrator-logo.png")
 
+    @app.get("/favicon.png")
+    def favicon():
+        return FileResponse(Path(__file__).with_name("assets") / "favicon.png")
+
     return app
