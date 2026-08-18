@@ -40,6 +40,12 @@ def build_node_compose(spec: NodeRuntimeSpec) -> str:
             "      - NET_ADMIN",
         ])
 
+    if spec.mount_letsencrypt:
+        lines.extend([
+            "    volumes:",
+            "      - /etc/letsencrypt:/etc/letsencrypt:ro",
+        ])
+
     lines.extend([
         "    ulimits:",
         "      nofile:",

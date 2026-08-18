@@ -101,7 +101,8 @@ class RemnawaveV32Adapter:
         existing: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         inbound_uuid = inbound.get("uuid")
-        if not inbound_uuid:
+        profile_uuid = inbound.get("profileUuid") or inbound.get("configProfileUuid")
+        if not inbound_uuid or not profile_uuid:
             raise ManagerError(f"Inbound {desired.get('inbound_tag')} не содержит uuid")
 
         payload = _strip_read_only(existing or {})
@@ -109,8 +110,22 @@ class RemnawaveV32Adapter:
             "remark": desired.get("remark"),
             "address": desired.get("address"),
             "port": desired.get("port"),
-            "inboundUuid": inbound_uuid,
+            "inbound": {
+                "configProfileUuid": profile_uuid,
+                "configProfileInboundUuid": inbound_uuid,
+            },
         })
+        for key in (
+            "path",
+            "sni",
+            "host",
+            "alpn",
+            "fingerprint",
+            "securityLayer",
+            "xhttpExtraParams",
+        ):
+            if key in desired:
+                payload[key] = desired[key]
         if existing and existing.get("uuid"):
             payload["uuid"] = existing["uuid"]
         return payload

@@ -36,6 +36,7 @@ class MobileProfileSettings:
     reality_raw_port: int = 8443
     hysteria_port: int = 443
     host_front_local_port: int = 9443
+    host_front_listen: str = "127.0.0.1"
     host_front_external_port: int = 443
     xhttp_path: str = "/mobile"
     host_front_path: str = "/edge"
@@ -64,6 +65,8 @@ class MobileProfileSettings:
             raise ValueError("front_domain выглядит некорректно")
         if not self.hysteria_auth:
             raise ValueError("hysteria_auth пуст")
+        if not self.host_front_listen:
+            raise ValueError("host_front_listen пуст")
 
 
 @dataclass(slots=True)

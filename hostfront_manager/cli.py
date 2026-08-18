@@ -60,6 +60,7 @@ from .telemetry.client import submit as submit_telemetry
 from .models import ExitCode
 from .render import print_json, render_doctor, render_status
 from .state import collect_host_state
+from .security import redact_sensitive
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -122,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
     nc = sub.add_parser("node-compose")
     nc.add_argument("--node-port", type=int)
     nc.add_argument("--secret-key", required=True)
+    nc.add_argument("--mount-letsencrypt", action="store_true")
     nc.add_argument("--output", type=Path)
 
     nr = sub.add_parser("node-remote-deploy")
@@ -131,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     nr.add_argument("--identity-file")
     nr.add_argument("--node-port", type=int)
     nr.add_argument("--secret-key", required=True)
+    nr.add_argument("--mount-letsencrypt", action="store_true")
     nr.add_argument("--prepare", action="store_true")
     nr.add_argument("--no-start", action="store_true")
 
@@ -160,6 +163,7 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--reality-raw-port", type=int, default=8443)
     pb.add_argument("--hysteria-port", type=int, default=443)
     pb.add_argument("--front-local-port", type=int, default=9443)
+    pb.add_argument("--front-listen", default="127.0.0.1")
     pb.add_argument("--front-external-port", type=int, default=443)
     pb.add_argument("--validate", action="store_true")
 
@@ -239,20 +243,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _menu() -> str:
     print()
-    print("=== HostFront Manager v4.0 ===")
-    print("1. Статус")
+    print("=== HostFront Console ===")
+    print("Консольная панель управления HostFront/VPN-инфраструктурой")
+    print("1. Состояние сервера")
     print("2. Полная диагностика")
-    print("3. Self-Test")
-    print("4. Создать backup")
-    print("5. Показать backups")
-    print("6. Показать конфигурацию")
-    print("7. Установить Remnawave + Caddy")
-    print("8. Mobile Resilience Status")
-    print("9. Remnawave Inventory")
-    print("10. Node Lifecycle / Deploy")
-    print("11. Mobile Profile Builder")
-    print("12. Deploy / Transactions")
-    print("13. Rollback / Node Assignment / Failover")
+    print("3. Самопроверка Manager")
+    print("4. Создать резервную копию")
+    print("5. Показать резервные копии")
+    print("6. Показать безопасную конфигурацию")
+    print("7. Установка и обновление компонентов")
+    print("8. Устойчивость мобильных подключений")
+    print("9. Ноды и объекты Remnawave")
+    print("10. Управление нодами")
+    print("11. Конструктор мобильного профиля")
+    print("12. Применение и история транзакций")
+    print("13. Откат, роли нод и переключение транспорта")
+    print("14. Состояние watchdog и Auto Repair")
     print("0. Выход")
     print()
     value = input("Выбери пункт: ").strip()
@@ -263,13 +269,14 @@ def _menu() -> str:
         "4": "backup",
         "5": "backups",
         "6": "config-show",
-        "7": "install-all",
+        "7": "install-menu",
         "8": "mobile-status",
         "9": "remnawave-inventory",
         "10": "node-menu",
         "11": "profile-menu",
         "12": "deploy-menu",
         "13": "resilience-menu",
+        "14": "watchdog-status",
         "0": "exit",
     }.get(value, "")
 
@@ -330,7 +337,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             return ExitCode.ERROR
 
     if cmd == "resilience-menu":
-        print("=== RESILIENCE CONTROL ===")
+        print("=== УСТОЙЧИВОСТЬ И ОТКАТ ===")
         print("Команды:")
         print("  transaction-rollback <transaction-id>")
         print("  node-role-plan --bundle ... --node-uuid ... --profile-uuid ... --role edge")
@@ -339,7 +346,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         return ExitCode.OK
 
     if cmd == "deploy-menu":
-        print("=== DEPLOY / TRANSACTIONS ===")
+        print("=== ПРИМЕНЕНИЕ И ТРАНЗАКЦИИ ===")
         print("Команды:")
         print("  remnawave-capabilities")
         print("  deploy-mobile-plan ./mobile-bundle")
@@ -348,7 +355,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         return ExitCode.OK
 
     if cmd == "profile-menu":
-        print("=== MOBILE PROFILE BUILDER ===")
+        print("=== КОНСТРУКТОР МОБИЛЬНОГО ПРОФИЛЯ ===")
         print("Используй команды:")
         print("  profile-generate-secrets --with-reality")
         print("  mobile-profile-build ... --output-dir ./bundle --validate")
@@ -356,13 +363,20 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         return ExitCode.OK
 
     if cmd == "node-menu":
-        print("=== NODE LIFECYCLE ===")
+        print("=== УПРАВЛЕНИЕ НОДАМИ ===")
         print("Используй CLI-команды:")
         print("  node-plan --payload node.json")
         print("  node-plan --payload node.json --apply")
         print("  node-compose --secret-key ...")
         print("  node-remote-deploy --host ... --secret-key ...")
         print("  node-remote-health --host ...")
+        return ExitCode.OK
+
+    if cmd == "install-menu":
+        print("=== УСТАНОВКА И ОБНОВЛЕНИЕ ===")
+        print("Безопасные команды запускаются с явными доменами:")
+        print("  hostfront-manager install-all --panel-domain ... --subscription-domain ...")
+        print("  sudo bash install.sh --panel-domain ... --subscription-domain ...")
         return ExitCode.OK
 
     if cmd == "version":
@@ -642,7 +656,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         if getattr(args, "raw", False):
             data["raw"] = raw
         if args.json or getattr(args, "raw", False):
-            print_json(data)
+            print_json(redact_sensitive(data))
         else:
             print("=== REMNAWAVE INVENTORY ===")
             for key, value in summary.to_dict().items():
@@ -696,6 +710,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             node_port=node_port,
             secret_key=args.secret_key,
             enable_net_admin=cfg.nodes.enable_net_admin,
+            mount_letsencrypt=args.mount_letsencrypt,
         )
         compose = build_node_compose(spec)
         if args.output:
@@ -739,6 +754,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             node_port=args.node_port or cfg.nodes.default_node_port,
             secret_key=args.secret_key,
             enable_net_admin=cfg.nodes.enable_net_admin,
+            mount_letsencrypt=args.mount_letsencrypt,
         )
         compose = build_node_compose(spec)
         deploy_compose(
@@ -794,6 +810,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             reality_raw_port=args.reality_raw_port,
             hysteria_port=args.hysteria_port,
             host_front_local_port=args.front_local_port,
+            host_front_listen=args.front_listen,
             host_front_external_port=args.front_external_port,
             xhttp_path=args.xhttp_path,
             host_front_path=args.front_path,
@@ -901,8 +918,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                 "capabilities": caps.to_dict(),
                 "plan": plan.to_dict(),
             }
-            print_json(data) if args.json else print(
-                json.dumps(data, ensure_ascii=False, indent=2)
+            safe_data = redact_sensitive(data)
+            print_json(safe_data) if args.json else print(
+                json.dumps(safe_data, ensure_ascii=False, indent=2)
             )
             return ExitCode.OK
 
@@ -998,12 +1016,76 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                 "applied": applied,
                 "verification": verification,
             }
-            print_json(data) if args.json else print(
-                json.dumps(data, ensure_ascii=False, indent=2)
+            safe_data = redact_sensitive(data)
+            print_json(safe_data) if args.json else print(
+                json.dumps(safe_data, ensure_ascii=False, indent=2)
             )
             return ExitCode.OK
 
         except Exception as exc:
+            if (
+                cfg.deploy.automatic_rollback
+                and journal.status(tx) not in {
+                    "rolled_back",
+                    "rollback_verification_failed",
+                    "rollback_failed",
+                }
+                and (tx.path / "applied.json").exists()
+            ):
+                partial = json.loads(
+                    (tx.path / "applied.json").read_text(encoding="utf-8")
+                )
+                if partial.get("results"):
+                    inverse = build_inverse_plan(snapshot, partial)
+                    journal.write_json(
+                        tx.path / "inverse-plan.json",
+                        [step.to_dict() for step in inverse],
+                    )
+                    try:
+                        rollback_result = apply_inverse_plan(
+                            client,
+                            inverse,
+                            require_verified_shape=cfg.deploy.require_verified_rollback_shape,
+                            apply=True,
+                        )
+                        journal.write_json(
+                            tx.path / "rollback-result.json", rollback_result
+                        )
+                        rollback_verify = verify_rollback_after_apply(
+                            client, snapshot, partial
+                        )
+                        journal.write_json(
+                            tx.path / "rollback-verify.json", rollback_verify
+                        )
+                        rollback_status = (
+                            "rolled_back" if rollback_verify.get("ok")
+                            else "rollback_verification_failed"
+                        )
+                        journal.update_status(
+                            tx,
+                            rollback_status,
+                            {
+                                "apply_error": str(exc),
+                                "rollback_verification": rollback_verify,
+                            },
+                        )
+                    except Exception as rollback_exc:
+                        journal.update_status(
+                            tx,
+                            "rollback_failed",
+                            {
+                                "apply_error": str(exc),
+                                "rollback_error": str(rollback_exc),
+                            },
+                        )
+                        raise ManagerError(
+                            "Apply завершился ошибкой, затем ошибкой завершился rollback. "
+                            f"Transaction: {tx.id}; rollback: {rollback_exc}"
+                        ) from exc
+                    raise ManagerError(
+                        "Apply завершился ошибкой; выполнен автоматический rollback. "
+                        f"Transaction: {tx.id}; status: {rollback_status}"
+                    ) from exc
             journal.update_failure(tx, exc)
             raise
 

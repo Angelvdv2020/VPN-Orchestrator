@@ -13,6 +13,17 @@ def test_compose():
     assert "NET_ADMIN" in text
 
 
+def test_compose_can_mount_letsencrypt_read_only():
+    text = build_node_compose(
+        NodeRuntimeSpec(
+            node_port=2222,
+            secret_key="abc123",
+            mount_letsencrypt=True,
+        )
+    )
+    assert "/etc/letsencrypt:/etc/letsencrypt:ro" in text
+
+
 def test_plan_create():
     plan = plan_node({"name": "new-node", "port": 2222}, {"response": []})
     assert plan.action == PlanAction.CREATE

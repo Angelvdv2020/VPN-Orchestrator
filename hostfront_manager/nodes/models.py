@@ -31,6 +31,7 @@ class NodeRuntimeSpec:
     secret_key: str
     image: str = "remnawave/node:latest"
     enable_net_admin: bool = True
+    mount_letsencrypt: bool = False
     nofile: int = 1048576
 
     def to_dict(self) -> dict[str, Any]:

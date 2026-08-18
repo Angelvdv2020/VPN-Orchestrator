@@ -17,6 +17,7 @@ TERMINAL_STATUSES = frozenset({
     "verification_failed",
     "rolled_back",
     "rollback_verification_failed",
+    "rollback_failed",
 })
 
 
@@ -87,6 +88,10 @@ class TransactionJournal:
             return False
         self.update_status(tx, "failed", {"error": str(error)})
         return True
+
+    def status(self, tx: Transaction) -> str:
+        manifest = json.loads((tx.path / "manifest.json").read_text(encoding="utf-8"))
+        return str(manifest.get("status") or "")
 
     def list_transactions(self) -> list[Path]:
         root = self._write_root()

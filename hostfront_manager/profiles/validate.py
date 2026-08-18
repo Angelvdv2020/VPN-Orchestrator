@@ -62,7 +62,7 @@ def structural_validate(config: dict[str, Any]) -> list[str]:
             errors.append(f"{tag or idx}: неожиданный protocol={protocol}")
 
         stream = inbound.get("streamSettings", {})
-        method = stream.get("method")
+        method = stream.get("network")
         security = stream.get("security", "none")
 
         if security == "reality":

@@ -13,7 +13,7 @@ def _reality_stream(
     path: str | None = None,
 ) -> dict[str, Any]:
     stream = {
-        "method": method,
+        "network": method,
         "security": "reality",
         "realitySettings": {
             "show": False,
@@ -21,8 +21,6 @@ def _reality_stream(
             "xver": 0,
             "serverNames": [settings.reality.server_name],
             "privateKey": settings.reality.private_key,
-            "minClientVer": settings.min_xray_version,
-            "maxClientVer": "",
             "maxTimeDiff": 0,
             "shortIds": [settings.reality.short_id],
         },
@@ -73,7 +71,21 @@ def _hysteria_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
             "users": [],
         },
         "streamSettings": {
-            "method": "hysteria",
+            "network": "hysteria",
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": settings.edge_domain,
+                "certificates": [
+                    {
+                        "certificateFile": (
+                            f"/etc/letsencrypt/live/{settings.edge_domain}/fullchain.pem"
+                        ),
+                        "keyFile": (
+                            f"/etc/letsencrypt/live/{settings.edge_domain}/privkey.pem"
+                        ),
+                    }
+                ],
+            },
             "hysteriaSettings": {
                 "version": 2,
                 "auth": settings.hysteria_auth,
@@ -101,7 +113,7 @@ def _host_front_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
     # acceptable only on this trusted local hop.
     return {
         "tag": "MOBILE-HOST-FRONT",
-        "listen": "127.0.0.1",
+        "listen": settings.host_front_listen,
         "port": settings.host_front_local_port,
         "protocol": "vless",
         "settings": {
@@ -109,7 +121,7 @@ def _host_front_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
             "decryption": "none",
         },
         "streamSettings": {
-            "method": "xhttp",
+            "network": "xhttp",
             "security": "none",
             "xhttpSettings": {
                 "path": settings.host_front_path,
@@ -184,7 +196,7 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "protocol": item["protocol"],
             "listen": item["listen"],
             "port": item["port"],
-            "transport": item.get("streamSettings", {}).get("method", ""),
+            "transport": item.get("streamSettings", {}).get("network", ""),
             "security": item.get("streamSettings", {}).get("security", ""),
         }
         for item in inbounds
@@ -197,6 +209,9 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "port": settings.reality_xhttp_port,
             "inbound_tag": "MOBILE-REALITY-XHTTP",
             "network": "tcp",
+            "path": settings.xhttp_path,
+            "sni": settings.reality.server_name,
+            "fingerprint": "chrome",
         },
         {
             "remark": f"{settings.name} Reality RAW",
@@ -204,6 +219,8 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "port": settings.reality_raw_port,
             "inbound_tag": "MOBILE-REALITY-RAW",
             "network": "tcp",
+            "sni": settings.reality.server_name,
+            "fingerprint": "chrome",
         },
         {
             "remark": f"{settings.name} Hysteria2",
@@ -211,6 +228,8 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "port": settings.hysteria_port,
             "inbound_tag": "MOBILE-HY2",
             "network": "udp",
+            "sni": settings.edge_domain,
+            "securityLayer": "TLS",
         },
         {
             "remark": f"{settings.name} Host Front",
@@ -218,6 +237,9 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "port": settings.host_front_external_port,
             "inbound_tag": "MOBILE-HOST-FRONT",
             "network": "tcp",
+            "path": settings.host_front_path,
+            "sni": settings.front_domain,
+            "securityLayer": "TLS",
         },
     ]
 
@@ -250,7 +272,7 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
     caddy_front = f"""https://{settings.front_domain}:{settings.host_front_external_port} {{
     encode
     @mobile path {settings.host_front_path}*
-    reverse_proxy @mobile 127.0.0.1:{settings.host_front_local_port}
+    reverse_proxy @mobile {settings.host_front_listen}:{settings.host_front_local_port}
     respond 404
 }}
 """

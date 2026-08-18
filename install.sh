@@ -58,6 +58,7 @@ install -d -m 0755 /opt/hostfront-manager /etc/hostfront-manager \
 python3 -m venv /opt/hostfront-manager/.venv
 /opt/hostfront-manager/.venv/bin/pip install --upgrade pip
 /opt/hostfront-manager/.venv/bin/pip install "$SOURCE_DIR"
+ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/hostfront-manager
 
 sed \
   -e "s#https://panel.example.com#https://${PANEL_DOMAIN}#g" \
@@ -86,4 +87,5 @@ fi
 echo
 echo "HostFront Manager installed."
 echo "Panel: https://${PANEL_DOMAIN}"
+echo "Console: sudo hostfront-manager"
 echo "Next: create a Remnawave API token and run 'hostfront-manager secret-set REMNAWAVE_TOKEN'."

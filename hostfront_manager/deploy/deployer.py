@@ -77,6 +77,13 @@ def apply_mobile_bundle_v32(
     adapter = RemnawaveV32Adapter(client)
     results: list[dict[str, Any]] = []
 
+    def checkpoint(profile_uuid: str | None = None, inbounds: dict[str, Any] | None = None) -> None:
+        journal.write_json(tx.path / "applied.json", {
+            "profile_uuid": profile_uuid,
+            "inbound_tags": sorted(inbounds or {}),
+            "results": results,
+        })
+
     # Phase 1: profile.
     profiles_raw = client.get_config_profiles()
     profiles = _unwrap_list(
@@ -91,9 +98,11 @@ def apply_mobile_bundle_v32(
         "phase": 1,
         "kind": profile_result.kind,
         "action": profile_result.action,
+        "name": profile_name,
         "response": profile_result.response,
     })
     journal.write_json(tx.path / "phase1-profile.json", results[-1])
+    checkpoint()
 
     profile_uuid = (
         str(existing_profile.get("uuid")) if existing_profile and existing_profile.get("uuid")
@@ -120,6 +129,7 @@ def apply_mobile_bundle_v32(
             + ", ".join(missing_tags)
         )
     journal.write_json(tx.path / "phase2-inbounds.json", inbounds)
+    checkpoint(profile_uuid, inbounds)
 
     # Phase 3: Hosts.
     hosts_raw = client.get_hosts()
@@ -137,6 +147,7 @@ def apply_mobile_bundle_v32(
             "response": result.response,
         }
         results.append(row)
+        checkpoint(profile_uuid, inbounds)
 
     journal.write_json(tx.path / "phase3-hosts.json", results)
 
@@ -159,6 +170,7 @@ def apply_mobile_bundle_v32(
         "name": squad_name,
         "response": squad_result.response,
     })
+    checkpoint(profile_uuid, inbounds)
     journal.write_json(tx.path / "phase4-squad.json", results[-1])
 
     return {

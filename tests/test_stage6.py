@@ -3,6 +3,7 @@ from pathlib import Path
 from hostfront_manager.deploy.planner import build_deploy_plan
 from hostfront_manager.deploy.bundle import MobileBundle
 from hostfront_manager.remnawave.capabilities import _extract_version
+from hostfront_manager.deploy.adapter_v32 import RemnawaveV32Adapter
 
 
 def test_extract_version():
@@ -32,3 +33,16 @@ def test_plan_create():
     plan = build_deploy_plan(bundle, snapshot)
     assert plan.steps[0].kind == "config-profile"
     assert plan.steps[0].action == "create"
+
+
+def test_host_payload_uses_v32_inbound_object():
+    adapter = RemnawaveV32Adapter(client=None)
+    payload = adapter.build_host_payload(
+        {"remark": "Mobile", "address": "edge.example", "port": 443},
+        {"uuid": "inbound-uuid", "profileUuid": "profile-uuid"},
+    )
+    assert payload["inbound"] == {
+        "configProfileUuid": "profile-uuid",
+        "configProfileInboundUuid": "inbound-uuid",
+    }
+    assert "inboundUuid" not in payload
