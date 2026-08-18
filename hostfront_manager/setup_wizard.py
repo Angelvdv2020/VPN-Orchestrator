@@ -134,10 +134,21 @@ def _stage(label: str, state: str = "⏳") -> None:
 def _clear_screen() -> None:
     """Clear real terminals and remain usable in minimal SSH/CI sessions."""
     if os.environ.get("TERM") and shutil.which("clear"):
-        result = subprocess.run(["clear"], check=False, capture_output=True, text=True)
+        result = subprocess.run(["clear"], check=False)
         if result.returncode == 0:
             return
-    print("\033[2J\033[H", end="", flush=True)
+    print("\033c\033[2J\033[3J\033[H", end="", flush=True)
+
+
+def _orchestrator_art() -> None:
+    print(f"{CYAN}{BOLD}")
+    print(" ██████╗ ██████╗  ██████╗██╗  ██╗███████╗███████╗████████╗██████╗  █████╗ ████████╗")
+    print("██╔═══██╗██╔══██╗██╔════╝██║  ██║██╔════╝██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝")
+    print("██║   ██║██████╔╝██║     ███████║█████╗  ███████╗   ██║   ██████╔╝███████║   ██║   ")
+    print("██║   ██║██╔══██╗██║     ██╔══██║██╔══╝  ╚════██║   ██║   ██╔══██╗██╔══██║   ██║   ")
+    print("╚██████╔╝██║  ██║╚██████╗██║  ██║███████╗███████║   ██║   ██║  ██║██║  ██║   ██║   ")
+    print(" ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   ")
+    print(f"{RESET}")
 
 
 def _initial_backup(cfg: AppConfig):
@@ -173,6 +184,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     """Five-step product-style first-run wizard with compact output."""
     def screen(step: int, title: str) -> None:
         _clear_screen()
+        _orchestrator_art()
         print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════╗{RESET}")
         print(f"{CYAN}{BOLD}║                    ORCHESTRATOR                   ║{RESET}")
         print(f"{CYAN}{BOLD}║                Мастер первого запуска               ║{RESET}")
