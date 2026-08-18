@@ -208,6 +208,17 @@ def _initial_backup(cfg: AppConfig):
     return create_backup(cfg, label="first-run")
 
 
+def _leftover_installation_paths() -> list[Path]:
+    """Find remnants of an earlier installation before changing anything."""
+    candidates = [
+        Path("/opt/remnawave"),
+        Path("/opt/remnanode"),
+        Path("/etc/systemd/system/hostfront-manager-web.service"),
+        Path("/etc/systemd/system/hostfront-manager-watchdog.service"),
+    ]
+    return [path for path in candidates if path.exists()]
+
+
 def _save_secret(path: Path, name: str, value: str) -> None:
     if not value or any(x in value for x in "\r\n"):
         raise ManagerError(f"Пустой или небезопасный секрет: {name}")
@@ -263,6 +274,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         print("  1. Полная установка (рекомендуется)")
         print("  2. Только выбранные компоненты")
         print("  3. Удалить ранее созданный bundle профиля")
+        print("  4. Полностью очистить установку")
         action = _ask("Действие", default="1")
         if action == "3":
             candidate = cfg.manager.data_dir / "bundles"
@@ -275,6 +287,14 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
                     print(f"{GREEN}✓ Bundle удалены. Установка отменена.{RESET}")
                     return {"removed": True, "bundle_dir": str(candidate)}
             raise ManagerError("Удаление отменено пользователем")
+        if action == "4":
+            cleanup = Path("/usr/local/sbin/vpn-orchestrator-uninstall")
+            if not cleanup.exists():
+                cleanup = Path("uninstall.sh")
+            if not cleanup.exists():
+                raise ManagerError("Скрипт полной очистки не найден")
+            subprocess.run(["bash", str(cleanup)], check=True)
+            return {"removed": True, "full_cleanup": True}
         if action == "2":
             install_admin = _ask("Установить веб-админку? 1 — да, 0 — нет", default="1") != "0"
             install_subscription = _ask("Установить страницу подписки? 1 — да, 0 — нет", default="1") != "0"
@@ -328,6 +348,12 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         reality_sni = _ask("REALITY SNI", required=True)
     print(f"Target: {reality_target}\nSNI:    {reality_sni}")
     print(f"{DIM}Ключи и технические секреты будут сгенерированы и сохранены автоматически.{RESET}")
+    leftovers = _leftover_installation_paths()
+    if leftovers:
+        print(f"\n{YELLOW}⚠ Найдены остатки предыдущей установки:{RESET}")
+        for path in leftovers:
+            print(f"  • {path}")
+        print(f"{DIM}Перед переустановкой рекомендуется выбрать расширенный режим → полная очистка.{RESET}")
     try:
         reality_private_key, _reality_public_key = generate_reality_keypair(runner)
         _generated_uuid, short_id, hysteria_auth = generate_basic()

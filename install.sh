@@ -67,6 +67,7 @@ ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/hostfr
 ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/vpn-orchestrator
 chown -R hostfront-manager:hostfront-manager /opt/hostfront-manager
 chmod 0755 /opt/hostfront-manager /opt/hostfront-manager/.venv /opt/hostfront-manager/.venv/bin/hostfront-manager
+install -m 0750 "$SOURCE_DIR/uninstall.sh" /usr/local/sbin/vpn-orchestrator-uninstall
 
 if [[ -e /etc/hostfront-manager/config.toml ]]; then
   echo "Preserving existing /etc/hostfront-manager/config.toml"
