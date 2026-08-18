@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hostfront-manager"
 version = "4.0.0rc3"
-description = "VPN Orchestrator для автоматизации инфраструктуры Remnawave"
+description = "ORCHESTRATOR для автоматизации инфраструктуры Remnawave"
 requires-python = ">=3.11"
-authors = [{name = "VPN Orchestrator"}]
+authors = [{name = "ORCHESTRATOR"}]
 dependencies = [
   "fastapi>=0.116,<1",
   "uvicorn>=0.35,<1",

@@ -275,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _menu() -> str:
     print()
-    print("=== VPN Orchestrator ===")
+    print("=== ORCHESTRATOR ===")
     print("Консольная панель управления VPN-инфраструктурой")
     print("1. Состояние сервера")
     print("2. Полная диагностика")

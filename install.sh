@@ -98,7 +98,7 @@ if [[ "$INSTALL_PANEL" -eq 1 ]]; then
 fi
 
 echo
-echo "VPN Orchestrator installed."
+echo "ORCHESTRATOR installed."
 echo "Panel: https://${PANEL_DOMAIN}"
 echo "Console: sudo hostfront-manager"
 echo "Next: create a Remnawave API token and run 'hostfront-manager secret-set REMNAWAVE_TOKEN'."

@@ -1,10 +1,10 @@
-# Топология VPN Orchestrator
+# Топология ORCHESTRATOR
 
 | Домен пользователя | Адрес пользователя | Назначение |
 |---|---|---|
 | `panel.example.com` | `<PANEL_ADDRESS>` | Remnawave Panel |
 | `sub.example.com` | `<PANEL_ADDRESS>` | Subscription Page |
-| `manager.example.com` | `<PANEL_ADDRESS>` | VPN Orchestrator API и dashboard |
+| `manager.example.com` | `<PANEL_ADDRESS>` | ORCHESTRATOR API и dashboard |
 | `front.example.com` | `<FRONT_ADDRESS>` | HOST-FRONT XHTTP/TLS |
 | `edge.example.com` | `<EDGE_ADDRESS>` | edge: REALITY XHTTP/RAW и Hysteria2 |
 

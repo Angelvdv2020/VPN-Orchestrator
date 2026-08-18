@@ -20,7 +20,7 @@ class InstallPlan:
 
 
 def interactive_plan() -> InstallPlan:
-    print("=== VPN Orchestrator — первоначальная установка ===")
+    print("=== ORCHESTRATOR — первоначальная установка ===")
     panel = validate_domain(input("Домен панели (panel.example.com): "))
     sub_raw = input("Домен страницы подписки (sub.example.com): ").strip()
     sub = validate_domain(sub_raw) if sub_raw else panel

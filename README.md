@@ -1,6 +1,6 @@
-# VPN Orchestrator
+# ORCHESTRATOR
 
-VPN Orchestrator — система автоматизации собственной VPN-инфраструктуры на
+ORCHESTRATOR — система автоматизации собственной VPN-инфраструктуры на
 Remnawave, рассчитанная на нестабильные и фильтруемые мобильные сети. Manager
 устанавливает компоненты, управляет нодами и профилями, собирает телеметрию,
 проверяет состояние инфраструктуры и безопасно откатывает неудачные изменения.
@@ -28,7 +28,7 @@ preflight-проверку свободного порта и runtime-прове
 
 ## Быстрый старт для новичков
 
-VPN Orchestrator помогает установить и управлять собственной VPN-инфраструктурой:
+ORCHESTRATOR помогает установить и управлять собственной VPN-инфраструктурой:
 
 - ⚙️ установить нужные компоненты;
 - 🌍 добавить VPN-серверы;
@@ -49,7 +49,7 @@ VPN Orchestrator помогает установить и управлять с�
 схема выглядит так:
 
 ```text
-🖥 Сервер 1: панель + VPN Orchestrator + подписки
+🖥 Сервер 1: панель + ORCHESTRATOR + подписки
                          ↓
 🌍 Сервер 2: VPN-нода
 ```
@@ -193,7 +193,7 @@ sudo hostfront-manager self-test
 
 Типовая схема без мобильных allowlist состоит из двух серверов:
 
-- **Manager/front** — Remnawave Panel, Subscription Page, VPN Orchestrator,
+- **Manager/front** — Remnawave Panel, Subscription Page, ORCHESTRATOR,
   Caddy и front-нода для HOST-FRONT;
 - **edge** — Remnawave Node с REALITY XHTTP, REALITY RAW и Hysteria2.
 
@@ -213,7 +213,7 @@ production-схемы. Один европейский сервер и росс�
 Доступность конкретного российского IP всё равно проверяется у нужного оператора
 во время реального ограничения.
 
-### Российские ingress-ноды VPN Orchestrator
+### Российские ingress-ноды ORCHESTRATOR
 
 В рабочем развёртывании можно использовать два отдельных входа у выбранных
 провайдеров. Домены, IP-адреса и названия провайдеров задаются пользователем и
@@ -285,7 +285,7 @@ sudo /opt/hostfront-manager/.venv/bin/hostfront-manager \
   --with-subscription
 ```
 
-## Консольная панель управления VPN Orchestrator
+## Консольная панель управления ORCHESTRATOR
 
 После установки доступна наша интерактивная русская консоль:
 
@@ -510,7 +510,7 @@ Manager → Remnawave API → Config Profiles / Hosts / Squads / Nodes
 Telemetry client → Manager API → оценка путей → рекомендация транспорта
 ```
 
-Manager/front содержит панель Remnawave, страницу подписок, Caddy, VPN Orchestrator
+Manager/front содержит панель Remnawave, страницу подписок, Caddy, ORCHESTRATOR
 Manager и локальную front-ноду. Edge обслуживает REALITY и Hysteria2.
 HOST-FRONT — отдельный резервный транспорт, а не название всей VPN.
 
@@ -522,7 +522,7 @@ HOST-FRONT — отдельный резервный транспорт, а не
 |---|---|---|
 | `panel.example.com` | Remnawave Panel | Manager/front |
 | `sub.example.com` | подписки | Manager/front |
-| `manager.example.com` | VPN Orchestrator | Manager/front |
+| `manager.example.com` | ORCHESTRATOR | Manager/front |
 | `front.example.com` | HOST-FRONT | Manager/front |
 | `edge.example.com` | edge-нода | Edge |
 
@@ -566,7 +566,7 @@ sudo hostfront-manager secret-set REMNAWAVE_TOKEN
 sudo systemctl restart hostfront-manager-web hostfront-manager-watchdog
 ```
 
-API-токен Remnawave и административный токен VPN Orchestrator — разные
+API-токен Remnawave и административный токен ORCHESTRATOR — разные
 секреты. Не добавляйте их в команды, README и историю shell.
 
 ### 4. Установка edge-ноды
@@ -611,7 +611,7 @@ sudo hostfront-manager node-remote-health \
 
 Edge должна слушать TCP/UDP 443, TCP 8443 и Node API 2222.
 
-### 5. Мобильный профиль VPN Orchestrator
+### 5. Мобильный профиль ORCHESTRATOR
 
 Сначала сгенерируйте секреты, затем создайте bundle:
 

@@ -163,7 +163,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     def screen(step: int, title: str) -> None:
         print("\033[2J\033[H", end="")
         print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════╗{RESET}")
-        print(f"{CYAN}{BOLD}║              VPN ORCHESTRATOR RC3                 ║{RESET}")
+        print(f"{CYAN}{BOLD}║                  ORCHESTRATOR RC3                 ║{RESET}")
         print(f"{CYAN}{BOLD}║                Мастер первого запуска               ║{RESET}")
         print(f"{CYAN}{BOLD}╚══════════════════════════════════════════════════════╝{RESET}\n")
         filled = "█" * (step * 4)
@@ -171,7 +171,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         print(f"\n{BLUE}{BOLD}🌐 {title.upper()}{RESET}\n")
 
     screen(1, "Домены и название")
-    print(f"{GREEN}Мастер сам подготовит VPN Orchestrator, ноды, профиль и админ-панель.{RESET}")
+    print(f"{GREEN}Мастер сам подготовит ORCHESTRATOR, ноды, профиль и админ-панель.{RESET}")
     print(f"{DIM}Enter — продолжить, Q — выйти.{RESET}")
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
@@ -253,7 +253,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
-    print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА VPN ORCHESTRATOR{RESET}\n")
+    print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА ORCHESTRATOR{RESET}\n")
     _stage("Проверка системы", "✅")
     _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
     _stage("Проверка портов", "✅")
