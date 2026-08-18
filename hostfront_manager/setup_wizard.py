@@ -126,104 +126,103 @@ def _deploy_local_node(cfg: AppConfig, runner: ShellRunner, compose: str) -> Non
 
 
 def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
-    """Interactive setup that gathers user data once and runs supported steps."""
+    """Five-step product-style first-run wizard with compact output."""
+    def screen(step: int, title: str) -> None:
+        print("\033[2J\033[H", end="")
+        print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════╗{RESET}")
+        print(f"{CYAN}{BOLD}║              HOSTFRONT MANAGER RC3                 ║{RESET}")
+        print(f"{CYAN}{BOLD}║                Мастер первого запуска               ║{RESET}")
+        print(f"{CYAN}{BOLD}╚══════════════════════════════════════════════════════╝{RESET}\n")
+        filled = "█" * (step * 4)
+        print(f"{BLUE}{BOLD}Шаг {step} из 5  {filled:<20}  {step * 20}%{RESET}")
+        print(f"\n{BLUE}{BOLD}🌐 {title.upper()}{RESET}\n")
+
     _banner()
     print(f"{GREEN}Мастер сам подготовит Manager, ноды, профиль и подписку.{RESET}")
-    print(f"{DIM}Нажмите Enter, чтобы принять значение по умолчанию.{RESET}")
-    _section(1, "Домены и название")
+    input(f"{DIM}Нажмите Enter, чтобы начать…{RESET}")
+
+    screen(1, "Домены и название")
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
-    profile_name = _ask("Название профиля и подписки", default="Мой мобильный профиль")
+    profile_name = _ask("Название профиля", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
-    xhttp_port = _ask_int("Порт REALITY XHTTP", default=8443)
-    raw_port = _ask_int("Порт REALITY RAW", default=8444)
-    hysteria_port = _ask_int("Порт Hysteria2 UDP", default=8445)
-    front_port = _ask_int("Публичный порт front", default=443)
-    _section(2, "Доступ к нодам")
-    edge_host = _ask("IP/hostname edge-сервера", required=True)
-    front_host = _ask("IP/hostname front-сервера", required=True)
+
+    screen(2, "VPN-серверы")
+    edge_host = _ask("IP/hostname EDGE-сервера", required=True)
+    front_host = _ask("IP/hostname FRONT-сервера", default=edge_host, required=True)
+    same_machine = edge_host == front_host
     edge_node_secret = secrets.token_hex(32)
     front_node_secret = secrets.token_hex(32)
-    print(f"{GREEN}✓ Node Secret edge/front сгенерированы автоматически и сохранены только в конфигурации.{RESET}")
-
-    # A single address for both roles is the supported local test mode. In that
-    # mode no private SSH key is required on the Manager host.
-    same_machine = edge_host == front_host
-    endpoints = (
-        ("edge", edge_host, edge_node_secret),
-        ("front", front_host, front_node_secret),
-    )
+    print(f"\n{GREEN}✓ Node Secret сгенерированы автоматически{RESET}")
     if same_machine:
-        print(
-            f"{YELLOW}Edge и front находятся на этом же сервере; SSH не нужен, "
-            f"нода будет запущена локально.{RESET}"
-        )
-        local_compose = build_node_compose(
-            NodeRuntimeSpec(
-                node_port=cfg.nodes.default_node_port,
-                secret_key=edge_node_secret,
-                enable_net_admin=cfg.nodes.enable_net_admin,
-            )
-        )
-        _retry_step("локальный запуск ноды", lambda: _deploy_local_node(cfg, runner, local_compose))
+        print(f"{DIM}Используется один сервер для EDGE и FRONT; SSH не потребуется.{RESET}")
+        ssh_user, ssh_port, identity = "root", 22, ""
         endpoints = ()
     else:
         ssh_user = _ask("SSH user для нод", default="root")
         ssh_port = _ask_int("SSH port для нод", default=22)
         identity = _ask("Путь к SSH private key", default="/root/.ssh/hostfront-edge")
-    if not same_machine and edge_host == front_host:
-        print(
-            f"{YELLOW}Одна машина указана для edge и front; SSH-развёртывание "
-            f"ноды выполняется один раз после настройки портов.{RESET}"
-        )
-        endpoints = (endpoints[0],)
+        endpoints = (("edge", edge_host, edge_node_secret), ("front", front_host, front_node_secret))
+
+    xhttp_port, raw_port, hysteria_port, front_port = 8443, 8444, 8445, 443
+    screen(3, "Сетевые параметры и REALITY")
+    print(f"REALITY XHTTP   {xhttp_port}/TCP   {GREEN}✅{RESET}")
+    print(f"REALITY RAW     {raw_port}/TCP   {GREEN}✅{RESET}")
+    print(f"Hysteria2       {hysteria_port}/UDP  {GREEN}✅{RESET}")
+    print(f"HOST-FRONT      {front_port}/TCP   {GREEN}✅{RESET}\n")
+    reality_target = "smartcaptcha.cloud.yandex.ru:443"
+    reality_sni = "smartcaptcha.cloud.yandex.ru"
+    print(f"Target: {reality_target}\nSNI:    {reality_sni}")
+    print(f"{DIM}Ключи и технические секреты будут сгенерированы и сохранены автоматически.{RESET}")
+    try:
+        reality_private_key, _reality_public_key = generate_reality_keypair(runner)
+        _generated_uuid, short_id, hysteria_auth = generate_basic()
+        print(f"{GREEN}Private Key: •••••••••••••••••••• ✅ сохранён{RESET}")
+    except ManagerError as exc:
+        print(f"{YELLOW}Автогенерация REALITY недоступна: {exc}{RESET}")
+        reality_private_key = _ask("REALITY private key", secret=True, required=True)
+        short_id = _ask("REALITY short ID", required=True)
+        hysteria_auth = _ask("Hysteria2 auth", secret=True, required=True)
+
+    screen(4, "Доступ Remnawave")
+    token = _ask("Remnawave API token", secret=True, required=True)
+    print(f"{GREEN}✓ Токен принят и будет сохранён защищённо{RESET}")
+
+    screen(5, "Проверка настроек")
+    print(f"Панель:       {panel}\nПодписка:     {subscription}")
+    print(f"EDGE:         {edge_host} ({edge_domain})\nFRONT:        {front_host} ({front_domain})")
+    print("\nПодключения:  ✅ REALITY XHTTP  ✅ REALITY RAW  ✅ Hysteria2  ✅ HOST-FRONT")
+    print(f"Порты:        {xhttp_port}, {raw_port}, {hysteria_port}, {front_port}")
+    confirm = input(f"\n{GREEN}1. 🚀 Установить{RESET}   {YELLOW}0. Отмена{RESET}\n› ").strip()
+    if confirm not in {"", "1", "д", "да", "y", "yes"}:
+        raise ManagerError("Установка отменена пользователем")
+
+    _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
+    os.environ[cfg.remnawave.token_env] = token
+    if same_machine:
+        local_compose = build_node_compose(NodeRuntimeSpec(
+            node_port=cfg.nodes.default_node_port,
+            secret_key=edge_node_secret,
+            enable_net_admin=cfg.nodes.enable_net_admin,
+        ))
+        _retry_step("настройка EDGE/FRONT", lambda: _deploy_local_node(cfg, runner, local_compose))
     for role, host, secret in endpoints:
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
         def deploy_one():
             ssh_test(runner, target)
             remote_prepare(runner, target)
-            compose = build_node_compose(
-                NodeRuntimeSpec(
-                    node_port=cfg.nodes.default_node_port,
-                    secret_key=secret,
-                    enable_net_admin=cfg.nodes.enable_net_admin,
-                )
-            )
+            compose = build_node_compose(NodeRuntimeSpec(
+                node_port=cfg.nodes.default_node_port,
+                secret_key=secret,
+                enable_net_admin=cfg.nodes.enable_net_admin,
+            ))
             deploy_compose(runner, target, compose, start=True)
-
-        _retry_step(f"подготовка {role}-ноды ({host})", deploy_one)
-        print(f"Нода {role} подготовлена: {host}")
-
-    _section(3, "Ключи транспортов")
-    print(f"{DIM}Секретные поля вводятся вслепую и не попадают в журнал.{RESET}")
-    reality_target = _ask(
-        "REALITY target host:port", default="smartcaptcha.cloud.yandex.ru:443"
-    )
-    reality_sni = _ask("REALITY SNI", default="smartcaptcha.cloud.yandex.ru")
-    print(f"{DIM}Генерирую REALITY keypair, short ID и Hysteria2 auth автоматически…{RESET}")
-    try:
-        reality_private_key, _reality_public_key = generate_reality_keypair(runner)
-        _generated_uuid, short_id, hysteria_auth = generate_basic()
-        print(f"{GREEN}✓ Ключи транспортов сгенерированы автоматически.{RESET}")
-    except ManagerError as exc:
-        print(f"{YELLOW}Не удалось автоматически создать REALITY keypair: {exc}{RESET}")
-        reality_private_key = _ask(
-            "REALITY private key (вставьте существующий ключ)", secret=True, required=True
-        )
-        short_id = _ask("REALITY short ID", required=True)
-        hysteria_auth = _ask("Hysteria2 auth", secret=True, required=True)
+        _retry_step(f"настройка {role.upper()}", deploy_one)
 
     plan = InstallPlan(panel, subscription, True)
     installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
 
-    _section(4, "Remnawave")
-    token = _ask("Remnawave API token", secret=True)
-    _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
-    os.environ[cfg.remnawave.token_env] = token
-    installation = _retry_step("проверка установки после сохранения токена", lambda: install_all(cfg, runner, plan))
-
-    _section(5, "Сборка профиля")
     settings = MobileProfileSettings(
         name=profile_name,
         edge_domain=edge_domain,
