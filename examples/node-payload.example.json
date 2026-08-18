@@ -1,6 +1,6 @@
 {
   "name": "SE-Mobile-01",
-  "address": "203.0.113.10",
+  "address": "<NODE_ADDRESS>",
   "port": 2222,
   "note": "Mobile resilience node"
 }

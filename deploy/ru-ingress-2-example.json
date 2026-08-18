@@ -1,6 +1,6 @@
 {
   "name": "My-RU-Ingress-2",
-  "address": "203.0.113.13",
+  "address": "<INGRESS_2_ADDRESS>",
   "port": 2222,
   "note": "Reserve Russian mobile ingress, ru-ingress-2.example.com",
   "countryCode": "RU",

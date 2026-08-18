@@ -215,16 +215,14 @@ production-схемы. Один европейский сервер и росс�
 
 ### Российские ingress-ноды VPN Orchestrator
 
-В рабочем развёртывании используются два отдельных входа одного провайдера
-Beget (`example-provider`):
-
-- `ru-ingress.example.com` → `203.0.113.12`, Nginx → `172.18.0.1:9443`;
-- `ru-ingress-2.example.com` → `203.0.113.13`, Caddy → `172.18.0.1:9443`.
+В рабочем развёртывании можно использовать два отдельных входа у выбранных
+провайдеров. Домены, IP-адреса и названия провайдеров задаются пользователем и
+в этот проект не записываются.
 
 Обе ноды запускают только inbound `MOBILE-HOST-FRONT`. Они не занимают
 публичный порт 443 отдельным процессом и не конфликтуют с существующими
-сайтами/VPN: TLS завершается в уже установленном reverse proxy. Node API на
-TCP 2222 разрешён firewall только для IP панели `203.0.113.10`.
+сайтами/VPN: TLS завершается в уже установленном reverse proxy. Node API следует
+разрешать firewall только для адреса панели пользователя.
 
 Шаблоны развёртывания находятся в `deploy/ru-ingress-example.json`,
 `deploy/ru-ingress-2-example.json`, `deploy/nginx-ru-ingress.example.conf` и
@@ -384,7 +382,7 @@ Git и не передавайте через открытые каналы.
 
 ```bash
 hostfront-manager node-remote-deploy \
-  --host 203.0.113.10 \
+  --host YOUR_NODE_ADDRESS \
   --user root \
   --identity-file /root/.ssh/hostfront-edge \
   --node-port 2222 \
@@ -396,7 +394,7 @@ hostfront-manager node-remote-deploy \
 
 ```bash
 hostfront-manager node-remote-health \
-  --host 203.0.113.10 \
+  --host YOUR_NODE_ADDRESS \
   --identity-file /root/.ssh/hostfront-edge \
   --logs
 ```
@@ -576,15 +574,15 @@ API-токен Remnawave и административный токен VPN Orch
 Сверьте SSH fingerprint, добавьте ключ и проверьте вход:
 
 ```bash
-ssh-keyscan -H 203.0.113.10 >> /root/.ssh/known_hosts
-ssh -i /root/.ssh/hostfront-edge root@203.0.113.10 true
+ssh-keyscan -H YOUR_NODE_ADDRESS >> /root/.ssh/known_hosts
+ssh -i /root/.ssh/hostfront-edge root@YOUR_NODE_ADDRESS true
 ```
 
 Создайте Node в Remnawave и используйте выданный ей secret:
 
 ```bash
 sudo hostfront-manager node-remote-deploy \
-  --host 203.0.113.10 \
+  --host YOUR_NODE_ADDRESS \
   --user root \
   --identity-file /root/.ssh/hostfront-edge \
   --node-port 2222 \
@@ -606,7 +604,7 @@ sudo certbot renew --dry-run --run-deploy-hooks
 
 ```bash
 sudo hostfront-manager node-remote-health \
-  --host 203.0.113.10 \
+  --host YOUR_NODE_ADDRESS \
   --identity-file /root/.ssh/hostfront-edge \
   --logs
 ```
