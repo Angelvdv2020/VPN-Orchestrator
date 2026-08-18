@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import getpass
-import json
 import os
 import re
 from pathlib import Path
@@ -19,10 +18,32 @@ from .profiles.bundle import write_bundle
 from .profiles.models import MobileProfileSettings, RealitySettings
 from .shell import ShellRunner
 
+RESET = "\033[0m"
+BOLD = "\033[1m"
+CYAN = "\033[36m"
+BLUE = "\033[34m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+DIM = "\033[2m"
+
+
+def _banner() -> None:
+    print(f"\n{CYAN}{BOLD}╔══════════════════════════════════════════════╗{RESET}")
+    print(f"{CYAN}{BOLD}║      HOSTFRONT MANAGER · ПЕРВЫЙ ЗАПУСК      ║{RESET}")
+    print(f"{CYAN}{BOLD}╚══════════════════════════════════════════════╝{RESET}")
+    print(
+        f"{DIM}Ваши домены, названия и секреты используются только для этой установки.{RESET}"
+    )
+
+
+def _section(number: int, title: str) -> None:
+    print(f"\n{BLUE}{BOLD}━━ {number}. {title} ━━{RESET}")
+
 
 def _ask(prompt: str, *, default: str = "", secret: bool = False) -> str:
-    suffix = f" [{default}]" if default else ""
-    value = (getpass.getpass if secret else input)(f"{prompt}{suffix}: ").strip()
+    suffix = f" {DIM}[по умолчанию: {default}]{RESET}" if default else ""
+    print(f"\n{YELLOW}{prompt}{RESET}{suffix}")
+    value = (getpass.getpass if secret else input)(f"{CYAN}  › {RESET}").strip()
     return value or default
 
 
@@ -40,13 +61,16 @@ def _save_secret(path: Path, name: str, value: str) -> None:
 
 def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     """Interactive setup that gathers user data once and runs supported steps."""
-    print("=== HostFront Manager — мастер первого запуска ===")
-    print("Все названия, домены и адреса ниже принадлежат вам и сохраняются в bundle.")
+    _banner()
+    print(f"{GREEN}Мастер сам подготовит Manager, ноды, профиль и подписку.{RESET}")
+    print(f"{DIM}Нажмите Enter, чтобы принять значение по умолчанию.{RESET}")
+    _section(1, "Домены и название")
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
     profile_name = _ask("Название профиля и подписки", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
+    _section(2, "Доступ к нодам")
     edge_host = _ask("IP/hostname edge-сервера", default="203.0.113.11")
     front_host = _ask("IP/hostname front-сервера", default="203.0.113.12")
     ssh_user = _ask("SSH user для нод", default="root")
@@ -72,7 +96,8 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         deploy_compose(runner, target, compose, start=True)
         print(f"Нода {role} подготовлена: {host}")
 
-    print("\nВведите параметры REALITY и Hysteria2 (они не выводятся на экран):")
+    _section(3, "Ключи транспортов")
+    print(f"{DIM}Секретные поля вводятся вслепую и не попадают в журнал.{RESET}")
     reality_target = _ask("REALITY target host:port", default="target.example:443")
     reality_sni = _ask("REALITY SNI", default="target.example")
     reality_private_key = _ask("REALITY private key", secret=True)
@@ -82,11 +107,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     plan = InstallPlan(panel, subscription, True)
     installation = install_all(cfg, runner, plan)
 
+    _section(4, "Remnawave")
     token = _ask("Remnawave API token", secret=True)
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
     installation = install_all(cfg, runner, plan)
 
+    _section(5, "Сборка профиля")
     settings = MobileProfileSettings(
         name=profile_name,
         edge_domain=edge_domain,
@@ -113,5 +140,8 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         "files": [str(x) for x in files],
         "next": "Проверьте bundle и выполните deploy-mobile-plan перед apply.",
     }
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    print(f"\n{GREEN}{BOLD}✓ ГОТОВО{RESET}")
+    print(f"{GREEN}Профиль: {profile_name}{RESET}")
+    print(f"{GREEN}Bundle:  {output_dir}{RESET}")
+    print(f"{DIM}{result['next']}{RESET}")
     return result
