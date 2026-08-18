@@ -7,6 +7,8 @@ import secrets
 import socket
 import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 from .config import AppConfig
@@ -129,6 +131,31 @@ def _port_state(port: int, udp: bool = False) -> str:
 
 def _stage(label: str, state: str = "⏳") -> None:
     print(f"{state} {label}")
+
+
+def _run_with_progress(label: str, action, *, interval: float = 4.0):
+    """Run a slow installer operation while keeping the terminal visibly alive.
+
+    ShellRunner intentionally captures command output so secrets and noisy Docker
+    logs never spill into the wizard.  The heartbeat replaces that blank screen
+    with a small, safe progress indicator until the operation finishes.
+    """
+    started = time.monotonic()
+    stop = threading.Event()
+
+    def heartbeat() -> None:
+        while not stop.wait(interval):
+            elapsed = int(time.monotonic() - started)
+            print(f"   {DIM}⏳ {label}… прошло {elapsed} с{RESET}", flush=True)
+
+    print(f"   {CYAN}⏳ {label}…{RESET}", flush=True)
+    thread = threading.Thread(target=heartbeat, name="installer-progress", daemon=True)
+    thread.start()
+    try:
+        return action()
+    finally:
+        stop.set()
+        thread.join(timeout=0.5)
 
 
 def _clear_screen() -> None:
@@ -266,7 +293,10 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     bootstrap_plan = InstallPlan(panel, subscription, False)
     _retry_step(
         "первичная установка Remnawave Panel",
-        lambda: install_all(cfg, runner, bootstrap_plan),
+        lambda: _run_with_progress(
+            "установка Remnawave Panel и запуск Docker-контейнеров",
+            lambda: install_all(cfg, runner, bootstrap_plan),
+        ),
     )
     screen(4, "Доступ Remnawave")
     print(f"{GREEN}Панель установлена: https://{panel}{RESET}")
@@ -289,7 +319,10 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     _stage("Проверка системы", "✅")
     _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
     _stage("Проверка портов", "✅")
-    backup_path = _retry_step("создание backup перед изменениями", lambda: _initial_backup(cfg))
+    backup_path = _retry_step(
+        "создание backup перед изменениями",
+        lambda: _run_with_progress("создание защищённого backup", lambda: _initial_backup(cfg)),
+    )
     _stage(
         f"Backup создан: {backup_path.name}" if backup_path else "Новая установка, backup до изменений не требуется",
         "✅" if backup_path else "ℹ",
@@ -301,7 +334,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             secret_key=edge_node_secret,
             enable_net_admin=cfg.nodes.enable_net_admin,
         ))
-        _retry_step("настройка EDGE/FRONT", lambda: _deploy_local_node(cfg, runner, local_compose))
+        _retry_step(
+            "настройка EDGE/FRONT",
+            lambda: _run_with_progress(
+                "запуск локальных EDGE/FRONT-контейнеров",
+                lambda: _deploy_local_node(cfg, runner, local_compose),
+            ),
+        )
         _stage("Настройка EDGE/FRONT", "✅")
     for role, host, secret in endpoints:
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
@@ -314,12 +353,24 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
                 enable_net_admin=cfg.nodes.enable_net_admin,
             ))
             deploy_compose(runner, target, compose, start=True)
-        _retry_step(f"настройка {role.upper()}", deploy_one)
+        _retry_step(
+            f"настройка {role.upper()}",
+            lambda role=role, deploy_one=deploy_one: _run_with_progress(
+                f"подготовка удалённой ноды {role.upper()}", deploy_one
+            ),
+        )
         _stage(f"Настройка {role.upper()}", "✅")
 
     plan = InstallPlan(panel, subscription, True, admin_domain=admin_domain)
-    _stage("Настройка Remnawave", "✅")
-    installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
+    _stage("Настройка Remnawave, профиля и веб-админки", "⏳")
+    installation = _retry_step(
+        "установка компонентов",
+        lambda: _run_with_progress(
+            "загрузка образов, настройка Remnawave и веб-админки",
+            lambda: install_all(cfg, runner, plan),
+        ),
+    )
+    _stage("Настройка Remnawave, профиля и веб-админки", "✅")
     _stage("Установка Manager", "✅")
     _stage("Создание профиля", "✅")
 
