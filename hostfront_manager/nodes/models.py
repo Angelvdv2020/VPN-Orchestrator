@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -29,7 +29,7 @@ class RemoteTarget:
 class NodeRuntimeSpec:
     node_port: int
     secret_key: str
-    image: str = "remnawave/node:latest"
+    image: str = "remnawave/node:3.2.2"
     enable_net_admin: bool = True
     mount_letsencrypt: bool = False
     nofile: int = 1048576

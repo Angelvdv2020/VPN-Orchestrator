@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 import time
 from pathlib import Path
@@ -13,15 +12,15 @@ from pydantic import BaseModel, Field
 from .. import __version__
 from ..config import AppConfig
 from ..errors import ManagerError
-from ..telemetry.auth import device_secret, verify
-from ..telemetry.store import TelemetryStore
-from ..watchdog.store import WatchdogStore
-from ..watchdog.checks import collect_signals
-from ..remnawave.client import RemnawaveClient
-from ..remnawave.inventory import fetch_inventory
 from ..mobile.engine import recommend
 from ..mobile.models import NetworkKind, ProbeSample, ProbeStatus
 from ..mobile.store import MobileStateStore
+from ..remnawave.client import RemnawaveClient
+from ..remnawave.inventory import fetch_inventory
+from ..telemetry.auth import device_secret, verify
+from ..telemetry.store import TelemetryStore
+from ..watchdog.checks import collect_signals
+from ..watchdog.store import WatchdogStore
 
 
 class TelemetryInput(BaseModel):
@@ -36,7 +35,9 @@ class TelemetryInput(BaseModel):
 
 
 def create_app(cfg: AppConfig) -> FastAPI:
-    app = FastAPI(title="HostFront Manager", version=__version__, docs_url=None, redoc_url=None)
+    app = FastAPI(
+        title="HostFront Manager", version=__version__, docs_url=None, redoc_url=None
+    )
     store = TelemetryStore(cfg.web.telemetry_db)
 
     def require_admin(authorization: Annotated[str | None, Header()] = None) -> None:
@@ -46,6 +47,7 @@ def create_app(cfg: AppConfig) -> FastAPI:
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(401, "Bearer token required")
         import hmac
+
         if not hmac.compare_digest(authorization[7:], expected):
             raise HTTPException(403, "Invalid admin token")
 
@@ -55,14 +57,20 @@ def create_app(cfg: AppConfig) -> FastAPI:
         if content_length:
             try:
                 if int(content_length) > 65536:
-                    return JSONResponse({"detail": "Request body too large"}, status_code=413)
+                    return JSONResponse(
+                        {"detail": "Request body too large"}, status_code=413
+                    )
             except ValueError:
-                return JSONResponse({"detail": "Invalid Content-Length"}, status_code=400)
+                return JSONResponse(
+                    {"detail": "Invalid Content-Length"}, status_code=400
+                )
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+        )
         return response
 
     @app.get("/healthz")
@@ -77,25 +85,40 @@ def create_app(cfg: AppConfig) -> FastAPI:
         x_nonce: Annotated[str, Header()],
         x_signature: Annotated[str, Header()],
     ):
-        body = await request.body()
+        chunks: list[bytes] = []
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > 65536:
+                raise HTTPException(413, "Request body too large")
+            chunks.append(chunk)
+        body = b"".join(chunks)
         secret = device_secret(cfg.web.telemetry_key_prefix, x_device_id)
         if not secret:
             raise HTTPException(401, "Unknown telemetry device")
         try:
-            verify(secret, x_timestamp, x_nonce, body, x_signature,
-                   max_skew=cfg.web.telemetry_max_clock_skew_seconds)
+            verify(
+                secret,
+                x_timestamp,
+                x_nonce,
+                body,
+                x_signature,
+                max_skew=cfg.web.telemetry_max_clock_skew_seconds,
+            )
             payload = TelemetryInput.model_validate_json(body)
             row_id = store.add(x_device_id, x_nonce, payload.model_dump())
             mobile_store = MobileStateStore(cfg.mobile.state_file)
             if payload.path_id in {x.id for x in mobile_store.paths()}:
-                mobile_store.add_sample(ProbeSample.now(
-                    payload.path_id,
-                    ProbeStatus(payload.status),
-                    latency_ms=payload.latency_ms,
-                    source=f"telemetry:{x_device_id}",
-                    detail=payload.detail,
-                    network_kind=NetworkKind(payload.network),
-                ))
+                mobile_store.add_sample(
+                    ProbeSample.now(
+                        payload.path_id,
+                        ProbeStatus(payload.status),
+                        latency_ms=payload.latency_ms,
+                        source=f"telemetry:{x_device_id}",
+                        detail=payload.detail,
+                        network_kind=NetworkKind(payload.network),
+                    )
+                )
             store.prune(int(time.time()) - cfg.web.telemetry_retention_days * 86400)
         except sqlite3.IntegrityError:
             raise HTTPException(409, "Telemetry nonce already used")
@@ -116,7 +139,10 @@ def create_app(cfg: AppConfig) -> FastAPI:
     @app.get("/api/v1/checks", dependencies=[Depends(require_admin)])
     def checks():
         signals = collect_signals(cfg)
-        return {"ok": all(x.ok for x in signals), "signals": [x.to_dict() for x in signals]}
+        return {
+            "ok": all(x.ok for x in signals),
+            "signals": [x.to_dict() for x in signals],
+        }
 
     @app.get("/api/v1/inventory", dependencies=[Depends(require_admin)])
     def inventory():
@@ -124,9 +150,11 @@ def create_app(cfg: AppConfig) -> FastAPI:
         if not token or not cfg.remnawave.base_url:
             raise HTTPException(503, "Remnawave API is not configured")
         try:
-            summary, _ = fetch_inventory(RemnawaveClient(
-                cfg.remnawave.base_url, token, cfg.manager.command_timeout_seconds
-            ))
+            summary, _ = fetch_inventory(
+                RemnawaveClient(
+                    cfg.remnawave.base_url, token, cfg.manager.command_timeout_seconds
+                )
+            )
         except ManagerError as exc:
             raise HTTPException(502, str(exc))
         return summary.to_dict()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any
 
 from .models import BuiltProfile, MobileProfileSettings
@@ -96,9 +95,7 @@ def _hysteria_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
                 "masquerade": {
                     "type": "string",
                     "content": "ok",
-                    "headers": {
-                        "content-type": "text/plain; charset=utf-8"
-                    },
+                    "headers": {"content-type": "text/plain; charset=utf-8"},
                     "statusCode": 200,
                 },
             },
@@ -111,7 +108,7 @@ def _hysteria_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
 
 
 def _host_front_inbound(settings: MobileProfileSettings) -> dict[str, Any]:
-    # This inbound is intentionally bound to localhost and expects a reverse proxy
+    # This inbound is intentionally bound to a private bridge address and expects a reverse proxy
     # on a domain controlled by the operator. VLESS without transport security is
     # acceptable only on this trusted local hop.
     return {
@@ -274,10 +271,18 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
     }
 
     caddy_front = f"""https://{settings.front_domain}:{settings.host_front_external_port} {{
-    encode
     @mobile path {settings.host_front_path}*
-    reverse_proxy @mobile {settings.host_front_listen}:{settings.host_front_local_port}
-    respond 404
+    handle @mobile {{
+        reverse_proxy {settings.host_front_listen}:{settings.host_front_local_port} {{
+            flush_interval -1
+            transport http {{
+                versions h2c 2
+            }}
+        }}
+    }}
+    handle {{
+        respond 404
+    }}
 }}
 """
 

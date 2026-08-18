@@ -24,7 +24,13 @@ minimum_free_disk_mb = 4096
 tcp_ports = [22, 80, 443]
 
 [backup]
-paths = ["/opt/remnawave", "/opt/remnanode", "/etc/caddy", "/etc/systemd/system"]
+paths = [
+  "/opt/remnawave",
+  "/opt/remnanode",
+  "/etc/caddy",
+  "/etc/systemd/system/hostfront-manager-web.service",
+  "/etc/systemd/system/hostfront-manager-watchdog.service",
+]
 
 [install]
 panel_dir = "/opt/remnawave"

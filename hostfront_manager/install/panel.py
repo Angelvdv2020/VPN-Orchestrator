@@ -14,8 +14,9 @@ from .common import (
     validate_domain,
 )
 
-COMPOSE_URL = "https://raw.githubusercontent.com/remnawave/backend/refs/heads/main/docker-compose-prod.yml"
-ENV_URL = "https://raw.githubusercontent.com/remnawave/backend/refs/heads/main/.env.sample"
+REMNAWAVE_VERSION = "3.2.3"
+COMPOSE_URL = f"https://raw.githubusercontent.com/remnawave/backend/{REMNAWAVE_VERSION}/docker-compose-prod.yml"
+ENV_URL = f"https://raw.githubusercontent.com/remnawave/backend/{REMNAWAVE_VERSION}/.env.sample"
 
 
 @dataclass(slots=True)
@@ -36,7 +37,9 @@ def install_panel(
 ) -> PanelInstallResult:
     require_root()
     panel_domain = validate_domain(panel_domain)
-    subscription_domain = validate_domain(subscription_domain) if subscription_domain else panel_domain
+    subscription_domain = (
+        validate_domain(subscription_domain) if subscription_domain else panel_domain
+    )
     ensure_docker(runner)
 
     base = cfg.install.panel_dir
@@ -70,7 +73,11 @@ def install_panel(
         text = replace_env_value(text, "WEBHOOK_SECRET_HEADER", token_hex(64))
         text = replace_database_password(text, token_hex(24))
     text = replace_env_value(text, "FRONT_END_DOMAIN", panel_domain)
-    sub_public = subscription_domain if subscription_domain != panel_domain else f"{panel_domain}/api/sub"
+    sub_public = (
+        subscription_domain
+        if subscription_domain != panel_domain
+        else f"{panel_domain}/api/sub"
+    )
     text = replace_env_value(text, "SUB_PUBLIC_DOMAIN", sub_public)
     text = replace_env_value(text, "PANEL_DOMAIN", panel_domain)
     atomic_write(env_file, text, 0o600)

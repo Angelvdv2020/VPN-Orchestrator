@@ -4,10 +4,8 @@ from hostfront_manager.nodes.planner import plan_node
 
 
 def test_compose():
-    text = build_node_compose(
-        NodeRuntimeSpec(node_port=2222, secret_key="abc123")
-    )
-    assert "remnawave/node:latest" in text
+    text = build_node_compose(NodeRuntimeSpec(node_port=2222, secret_key="abc123"))
+    assert "remnawave/node:3.2.2" in text
     assert "NODE_PORT=2222" in text
     assert "SECRET_KEY=abc123" in text
     assert "NET_ADMIN" in text
@@ -30,21 +28,13 @@ def test_plan_create():
 
 
 def test_plan_noop():
-    current = {
-        "response": [
-            {"uuid": "u1", "name": "n1", "port": 2222}
-        ]
-    }
+    current = {"response": [{"uuid": "u1", "name": "n1", "port": 2222}]}
     plan = plan_node({"name": "n1", "port": 2222}, current)
     assert plan.action == PlanAction.NOOP
 
 
 def test_plan_update():
-    current = {
-        "response": [
-            {"uuid": "u1", "name": "n1", "port": 1111}
-        ]
-    }
+    current = {"response": [{"uuid": "u1", "name": "n1", "port": 1111}]}
     plan = plan_node({"name": "n1", "port": 2222}, current)
     assert plan.action == PlanAction.UPDATE
     assert plan.current_uuid == "u1"

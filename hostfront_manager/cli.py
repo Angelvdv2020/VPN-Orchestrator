@@ -4,8 +4,8 @@ import argparse
 import getpass
 import json
 import logging
-import secrets
 import os
+import secrets
 import sys
 import time
 import traceback
@@ -14,53 +14,58 @@ from pathlib import Path
 from . import __version__
 from .backup import create_backup, list_backups, rollback
 from .config import AppConfig, load_config, load_secrets_environment
-from .diagnostics import run_doctor
-from .errors import ConfigError, LockError, ManagerError
-from .lock import ProcessLock
-from .logging_utils import setup_logging
-from .shell import ShellRunner
-from .install.wizard import InstallPlan, interactive_plan, install_all
-from .mobile.defaults import default_paths
-from .mobile.engine import recommend
-from .mobile.models import NetworkKind, ProbeSample, ProbeStatus
-from .mobile.probes import probe_path
-from .mobile.store import MobileStateStore
-from .remnawave.client import RemnawaveClient
-from .remnawave.inventory import fetch_inventory
-from .nodes.compose import build_node_compose
-from .nodes.lifecycle import apply_node_plan
-from .nodes.models import NodeRuntimeSpec, RemoteTarget
-from .nodes.payload import load_json_payload
-from .nodes.remote import deploy_compose, remote_health, remote_node_logs, remote_prepare, ssh_test
-from .profiles.builder import build_mobile_profile
-from .profiles.bundle import write_bundle
-from .profiles.keys import generate_basic, generate_reality_keypair
-from .profiles.models import MobileProfileSettings, RealitySettings
-from .profiles.validate import validate_with_xray
 from .deploy.bundle import load_mobile_bundle
 from .deploy.deployer import apply_mobile_bundle_v32
 from .deploy.journal import TransactionJournal
 from .deploy.planner import build_deploy_plan
 from .deploy.snapshot import capture_panel_snapshot
 from .deploy.verify import verify_panel_after_apply, verify_rollback_after_apply
-from .remnawave.capabilities import discover_capabilities
-from .rollback.engine import apply_inverse_plan
-from .rollback.models import InverseAction, InverseStep
-from .rollback.planner import build_inverse_plan
-from .nodes.assignment import build_assignment_plan
-from .remnawave.shape import unwrap_list
+from .diagnostics import run_doctor
+from .errors import ConfigError, LockError, ManagerError
+from .install.common import atomic_write
+from .install.services import render_services, write_services
+from .install.wizard import InstallPlan, install_all, interactive_plan
+from .lock import ProcessLock
+from .logging_utils import setup_logging
+from .mobile.defaults import default_paths
+from .mobile.engine import recommend
+from .mobile.models import NetworkKind, ProbeSample, ProbeStatus
 from .mobile.policy import decide_failover
+from .mobile.probes import probe_path
+from .mobile.store import MobileStateStore
+from .models import ExitCode
+from .nodes.assignment import build_assignment_plan
+from .nodes.compose import build_node_compose
+from .nodes.lifecycle import apply_node_plan
+from .nodes.models import NodeRuntimeSpec, RemoteTarget
+from .nodes.payload import load_json_payload
+from .nodes.remote import (
+    deploy_compose,
+    remote_health,
+    remote_node_logs,
+    remote_prepare,
+    ssh_test,
+)
+from .profiles.builder import build_mobile_profile
+from .profiles.bundle import write_bundle
+from .profiles.keys import generate_basic, generate_reality_keypair
+from .profiles.models import MobileProfileSettings, RealitySettings
+from .profiles.validate import validate_with_xray
+from .remnawave.capabilities import discover_capabilities
+from .remnawave.client import RemnawaveClient
+from .remnawave.inventory import fetch_inventory
+from .remnawave.shape import unwrap_list
+from .render import print_json, render_doctor, render_status
+from .rollback.engine import apply_inverse_plan
+from .rollback.planner import build_inverse_plan
+from .security import redact_sensitive
+from .shell import ShellRunner
+from .state import collect_host_state
+from .telemetry.client import submit as submit_telemetry
 from .watchdog.checks import collect_signals
 from .watchdog.engine import evaluate, record_repair
 from .watchdog.repair import restart_services
 from .watchdog.store import WatchdogStore
-from .install.services import render_services, write_services
-from .install.common import atomic_write
-from .telemetry.client import submit as submit_telemetry
-from .models import ExitCode
-from .render import print_json, render_doctor, render_status
-from .state import collect_host_state
-from .security import redact_sensitive
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -90,16 +95,22 @@ def build_parser() -> argparse.ArgumentParser:
     mi.add_argument("--front-host")
 
     mp = sub.add_parser("mobile-probe")
-    mp.add_argument("--network", choices=["unknown", "mobile", "wifi"], default="unknown")
+    mp.add_argument(
+        "--network", choices=["unknown", "mobile", "wifi"], default="unknown"
+    )
 
     ms = sub.add_parser("mobile-status")
-    ms.add_argument("--network", choices=["unknown", "mobile", "wifi"], default="unknown")
+    ms.add_argument(
+        "--network", choices=["unknown", "mobile", "wifi"], default="unknown"
+    )
 
     mr = sub.add_parser("mobile-record")
     mr.add_argument("path_id")
     mr.add_argument("--status", choices=["up", "down", "unknown"], required=True)
     mr.add_argument("--latency-ms", type=float)
-    mr.add_argument("--network", choices=["unknown", "mobile", "wifi"], default="mobile")
+    mr.add_argument(
+        "--network", choices=["unknown", "mobile", "wifi"], default="mobile"
+    )
     mr.add_argument("--detail", default="")
     mr.add_argument("--source", default="client")
 
@@ -163,7 +174,7 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--reality-raw-port", type=int, default=8443)
     pb.add_argument("--hysteria-port", type=int, default=443)
     pb.add_argument("--front-local-port", type=int, default=9443)
-    pb.add_argument("--front-listen", default="127.0.0.1")
+    pb.add_argument("--front-listen", default="172.18.0.1")
     pb.add_argument("--front-external-port", type=int, default=443)
     pb.add_argument("--validate", action="store_true")
 
@@ -180,7 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
     da.add_argument("bundle", type=Path)
     da.add_argument("--yes", action="store_true")
 
-    tl = sub.add_parser("transactions")
+    sub.add_parser("transactions")
 
     rb = sub.add_parser("transaction-rollback")
     rb.add_argument("transaction_id")
@@ -200,7 +211,9 @@ def build_parser() -> argparse.ArgumentParser:
     naa.add_argument("--yes", action="store_true")
 
     fo = sub.add_parser("mobile-failover")
-    fo.add_argument("--network", choices=["unknown", "mobile", "wifi"], default="mobile")
+    fo.add_argument(
+        "--network", choices=["unknown", "mobile", "wifi"], default="mobile"
+    )
     fo.add_argument("--current-path")
     fo.add_argument("--minimum-score-gain", type=float, default=15.0)
 
@@ -209,34 +222,43 @@ def build_parser() -> argparse.ArgumentParser:
     wo.add_argument("--repair", action="store_true")
     wo.add_argument("--yes", action="store_true")
     wr = sub.add_parser("watchdog-run")
-    wr.add_argument("--iterations", type=int, default=0,
-                    help="0 = работать постоянно")
+    wr.add_argument("--iterations", type=int, default=0, help="0 = работать постоянно")
 
     sub.add_parser("web-serve")
     sub.add_parser("admin-token-generate")
     sub.add_parser("telemetry-key-generate")
     si = sub.add_parser("secrets-init")
-    si.add_argument("--path", type=Path, default=Path("/etc/hostfront-manager/secrets.env"))
+    si.add_argument(
+        "--path", type=Path, default=Path("/etc/hostfront-manager/secrets.env")
+    )
     si.add_argument("--device-id", default="phone-1")
     si.add_argument("--yes", action="store_true")
     ss = sub.add_parser("secret-set")
     ss.add_argument("name", choices=["REMNAWAVE_TOKEN"])
-    ss.add_argument("--path", type=Path, default=Path("/etc/hostfront-manager/secrets.env"))
+    ss.add_argument(
+        "--path", type=Path, default=Path("/etc/hostfront-manager/secrets.env")
+    )
     ts = sub.add_parser("telemetry-submit")
     ts.add_argument("--endpoint", required=True)
     ts.add_argument("--device-id", required=True)
     ts.add_argument("--key-env", default="HOSTFRONT_DEVICE_KEY")
     ts.add_argument("--path-id", required=True)
     ts.add_argument("--status", choices=["up", "down", "unknown"], required=True)
-    ts.add_argument("--network", choices=["mobile", "wifi", "unknown"], default="mobile")
+    ts.add_argument(
+        "--network", choices=["mobile", "wifi", "unknown"], default="mobile"
+    )
     ts.add_argument("--operator", default="")
     ts.add_argument("--country", default="")
     ts.add_argument("--latency-ms", type=float)
     ts.add_argument("--detail", default="")
     sr = sub.add_parser("systemd-render")
     sr.add_argument("--output-dir", type=Path, required=True)
-    sr.add_argument("--executable", default="/opt/hostfront-manager/.venv/bin/hostfront-manager")
-    sr.add_argument("--config-path", type=Path, default=Path("/etc/hostfront-manager/config.toml"))
+    sr.add_argument(
+        "--executable", default="/opt/hostfront-manager/.venv/bin/hostfront-manager"
+    )
+    sr.add_argument(
+        "--config-path", type=Path, default=Path("/etc/hostfront-manager/config.toml")
+    )
 
     return p
 
@@ -340,7 +362,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         print("=== УСТОЙЧИВОСТЬ И ОТКАТ ===")
         print("Команды:")
         print("  transaction-rollback <transaction-id>")
-        print("  node-role-plan --bundle ... --node-uuid ... --profile-uuid ... --role edge")
+        print(
+            "  node-role-plan --bundle ... --node-uuid ... --profile-uuid ... --role edge"
+        )
         print("  node-role-apply ... --yes")
         print("  mobile-failover --network mobile --current-path reality-xhttp")
         return ExitCode.OK
@@ -375,7 +399,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
     if cmd == "install-menu":
         print("=== УСТАНОВКА И ОБНОВЛЕНИЕ ===")
         print("Безопасные команды запускаются с явными доменами:")
-        print("  hostfront-manager install-all --panel-domain ... --subscription-domain ...")
+        print(
+            "  hostfront-manager install-all --panel-domain ... --subscription-domain ..."
+        )
         print("  sudo bash install.sh --panel-domain ... --subscription-domain ...")
         return ExitCode.OK
 
@@ -395,8 +421,11 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         if not args.yes:
             raise ManagerError("Для secrets-init добавь --yes")
         if args.path.exists():
-            raise ManagerError(f"Файл уже существует, перезапись запрещена: {args.path}")
+            raise ManagerError(
+                f"Файл уже существует, перезапись запрещена: {args.path}"
+            )
         from .telemetry.auth import device_env_name
+
         device_name = device_env_name(cfg.web.telemetry_key_prefix, args.device_id)
         content = (
             f"{cfg.web.admin_token_env}={secrets.token_urlsafe(48)}\n"
@@ -404,9 +433,19 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             f"REMNAWAVE_TOKEN=\n"
         )
         atomic_write(args.path, content, 0o600)
-        data = {"path": str(args.path), "mode": "0600", "device_id": args.device_id,
-                "environment_names": [cfg.web.admin_token_env, device_name, "REMNAWAVE_TOKEN"]}
-        print_json(data) if args.json else print(json.dumps(data, ensure_ascii=False, indent=2))
+        data = {
+            "path": str(args.path),
+            "mode": "0600",
+            "device_id": args.device_id,
+            "environment_names": [
+                cfg.web.admin_token_env,
+                device_name,
+                "REMNAWAVE_TOKEN",
+            ],
+        }
+        print_json(data) if args.json else print(
+            json.dumps(data, ensure_ascii=False, indent=2)
+        )
         return ExitCode.OK
 
     if cmd == "secret-set":
@@ -435,16 +474,25 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         if not key:
             raise ManagerError(f"Не задан ${args.key_env}")
         payload = {
-            "observed_at": int(time.time()), "path_id": args.path_id,
-            "status": args.status, "network": args.network,
-            "operator": args.operator, "country": args.country.upper(),
-            "latency_ms": args.latency_ms, "detail": args.detail,
+            "observed_at": int(time.time()),
+            "path_id": args.path_id,
+            "status": args.status,
+            "network": args.network,
+            "operator": args.operator,
+            "country": args.country.upper(),
+            "latency_ms": args.latency_ms,
+            "detail": args.detail,
         }
         result = submit_telemetry(
-            args.endpoint, args.device_id, key, payload,
+            args.endpoint,
+            args.device_id,
+            key,
+            payload,
             timeout=cfg.manager.command_timeout_seconds,
         )
-        print_json(result) if args.json else print(json.dumps(result, ensure_ascii=False, indent=2))
+        print_json(result) if args.json else print(
+            json.dumps(result, ensure_ascii=False, indent=2)
+        )
         return ExitCode.OK
 
     if cmd == "systemd-render":
@@ -465,11 +513,19 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             raise ManagerError(f"Не задан ${cfg.web.admin_token_env}")
         try:
             import uvicorn
+
             from .web.app import create_app
         except ImportError as exc:
-            raise ManagerError("Web dependencies не установлены: pip install -e .") from exc
-        uvicorn.run(create_app(cfg), host=cfg.web.bind, port=cfg.web.port,
-                    proxy_headers=cfg.web.trusted_proxy, forwarded_allow_ips="127.0.0.1")
+            raise ManagerError(
+                "Web dependencies не установлены: pip install -e ."
+            ) from exc
+        uvicorn.run(
+            create_app(cfg),
+            host=cfg.web.bind,
+            port=cfg.web.port,
+            proxy_headers=cfg.web.trusted_proxy,
+            forwarded_allow_ips="127.0.0.1",
+        )
         return ExitCode.OK
 
     if cmd == "status":
@@ -492,15 +548,21 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         if args.dry_run:
             existing = [str(p) for p in cfg.backup.paths if p.exists()]
             data = {"dry_run": True, "would_backup": existing}
-            print_json(data) if args.json else print("Будет сохранено:\n" + "\n".join(existing))
+            print_json(data) if args.json else print(
+                "Будет сохранено:\n" + "\n".join(existing)
+            )
             return ExitCode.OK
         archive = create_backup(cfg)
-        print_json({"backup": str(archive)}) if args.json else print(f"Backup создан: {archive}")
+        print_json({"backup": str(archive)}) if args.json else print(
+            f"Backup создан: {archive}"
+        )
         return ExitCode.OK
 
     if cmd == "backups":
         items = [str(x) for x in list_backups(cfg)]
-        print_json(items) if args.json else print("\n".join(items) if items else "Backup пока нет")
+        print_json(items) if args.json else print(
+            "\n".join(items) if items else "Backup пока нет"
+        )
         return ExitCode.OK
 
     if cmd == "rollback":
@@ -515,7 +577,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
 
     if cmd == "config-show":
         data = _config_public(cfg)
-        print_json(data) if args.json else print(json.dumps(data, ensure_ascii=False, indent=2))
+        print_json(data) if args.json else print(
+            json.dumps(data, ensure_ascii=False, indent=2)
+        )
         return ExitCode.OK
 
     if cmd == "install-all":
@@ -546,14 +610,14 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             print(f"Subscription Page: {result['subscription']}")
         return ExitCode.OK
 
-
     if cmd == "mobile-init":
         store = MobileStateStore(cfg.mobile.state_file)
         paths = default_paths(args.host, args.front_host)
         saved = store.set_paths(paths)
         data = {"state_file": str(saved), "paths": [x.to_dict() for x in paths]}
         print_json(data) if args.json else print(
-            "Mobile profile создан:\n" + "\n".join(
+            "Mobile profile создан:\n"
+            + "\n".join(
                 f"- {x.name}: {x.network.upper()} {x.host}:{x.port}" for x in paths
             )
         )
@@ -563,7 +627,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         store = MobileStateStore(cfg.mobile.state_file)
         paths = store.paths()
         if not paths:
-            raise ManagerError("Mobile profile не создан. Сначала: mobile-init --host <domain>")
+            raise ManagerError(
+                "Mobile profile не создан. Сначала: mobile-init --host <domain>"
+            )
         network_kind = NetworkKind(args.network)
         rows = []
         for path in paths:
@@ -585,7 +651,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             print_json(data)
         else:
             for row in rows:
-                print(f"{row['path_id']:18} {row['status']:8} {row.get('detail','')}")
+                print(f"{row['path_id']:18} {row['status']:8} {row.get('detail', '')}")
             print()
             print("Рекомендация:", rec.reason)
         return ExitCode.OK
@@ -596,7 +662,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         store = MobileStateStore(cfg.mobile.state_file)
         paths = store.paths()
         if not paths:
-            raise ManagerError("Mobile profile не создан. Сначала: mobile-init --host <domain>")
+            raise ManagerError(
+                "Mobile profile не создан. Сначала: mobile-init --host <domain>"
+            )
         rec = recommend(
             paths,
             store.samples(),
@@ -616,7 +684,10 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                     f"score={row.score:6.1f}  {row.reason}"
                 )
             print()
-            print("Выбор:", rec.selected.path.name if rec.selected else "нет рабочего пути")
+            print(
+                "Выбор:",
+                rec.selected.path.name if rec.selected else "нет рабочего пути",
+            )
         return ExitCode.OK
 
     if cmd == "mobile-record":
@@ -662,7 +733,6 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             for key, value in summary.to_dict().items():
                 print(f"{key:18}: {value}")
         return ExitCode.OK
-
 
     if cmd in {"node-plan", "node-enable", "node-disable", "node-delete"}:
         token = cfg.remnawave.token()
@@ -725,9 +795,8 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             host=args.host,
             user=args.user or cfg.nodes.ssh_user,
             ssh_port=args.ssh_port or cfg.nodes.ssh_port,
-            identity_file=args.identity_file or (
-                str(cfg.nodes.identity_file) if cfg.nodes.identity_file else None
-            ),
+            identity_file=args.identity_file
+            or (str(cfg.nodes.identity_file) if cfg.nodes.identity_file else None),
         )
         runner = ShellRunner(
             logger,
@@ -763,12 +832,15 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             compose,
             start=not args.no_start,
         )
-        health = remote_health(runner, target) if not args.no_start else {"ok": True, "skipped": True}
+        health = (
+            remote_health(runner, target)
+            if not args.no_start
+            else {"ok": True, "skipped": True}
+        )
         print_json(health) if args.json else print(
             json.dumps(health, ensure_ascii=False, indent=2)
         )
         return ExitCode.OK if health.get("ok") else ExitCode.CHECK_FAILED
-
 
     if cmd == "profile-generate-secrets":
         runner = ShellRunner(
@@ -866,7 +938,6 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             json.dumps(result.to_dict(), ensure_ascii=False, indent=2)
         )
         return ExitCode.OK if result.ok else ExitCode.CHECK_FAILED
-
 
     if cmd in {
         "remnawave-capabilities",
@@ -983,7 +1054,8 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                     )
                     journal.update_status(
                         tx,
-                        "rolled_back" if rollback_verify.get("ok")
+                        "rolled_back"
+                        if rollback_verify.get("ok")
                         else "rollback_verification_failed",
                         {
                             "verification": verification,
@@ -1025,7 +1097,8 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         except Exception as exc:
             if (
                 cfg.deploy.automatic_rollback
-                and journal.status(tx) not in {
+                and journal.status(tx)
+                not in {
                     "rolled_back",
                     "rollback_verification_failed",
                     "rollback_failed",
@@ -1058,7 +1131,8 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                             tx.path / "rollback-verify.json", rollback_verify
                         )
                         rollback_status = (
-                            "rolled_back" if rollback_verify.get("ok")
+                            "rolled_back"
+                            if rollback_verify.get("ok")
                             else "rollback_verification_failed"
                         )
                         journal.update_status(
@@ -1069,7 +1143,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                                 "rollback_verification": rollback_verify,
                             },
                         )
-                    except Exception as rollback_exc:
+                    except Exception as rollback_exc:  # noqa: BLE001
                         journal.update_status(
                             tx,
                             "rollback_failed",
@@ -1097,14 +1171,13 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                 manifest = json.loads(
                     (path / "manifest.json").read_text(encoding="utf-8")
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 manifest = {"id": path.name, "status": "unreadable"}
             items.append(manifest)
         print_json(items) if args.json else print(
             json.dumps(items, ensure_ascii=False, indent=2)
         )
         return ExitCode.OK
-
 
     if cmd == "transaction-rollback":
         journal = TransactionJournal(cfg.deploy.transaction_dir)
@@ -1128,18 +1201,24 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
         journal.write_json(tx_path / "inverse-plan.json", inverse_json)
 
         if not args.yes:
-            print_json({
-                "transaction": args.transaction_id,
-                "apply": False,
-                "inverse_plan": inverse_json,
-                "message": "Это только план. Для применения добавь --yes.",
-            }) if args.json else print(
-                json.dumps({
+            print_json(
+                {
                     "transaction": args.transaction_id,
                     "apply": False,
                     "inverse_plan": inverse_json,
                     "message": "Это только план. Для применения добавь --yes.",
-                }, ensure_ascii=False, indent=2)
+                }
+            ) if args.json else print(
+                json.dumps(
+                    {
+                        "transaction": args.transaction_id,
+                        "apply": False,
+                        "inverse_plan": inverse_json,
+                        "message": "Это только план. Для применения добавь --yes.",
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
             )
             return ExitCode.OK
 
@@ -1285,7 +1364,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
 
     if cmd == "watchdog-status":
         state = WatchdogStore(cfg.watchdog.state_file).load()
-        print_json(state) if args.json else print(json.dumps(state, ensure_ascii=False, indent=2))
+        print_json(state) if args.json else print(
+            json.dumps(state, ensure_ascii=False, indent=2)
+        )
         return ExitCode.OK
 
     if cmd in {"watchdog-once", "watchdog-run"}:
@@ -1316,7 +1397,10 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                     dry_run=args.dry_run,
                 )
                 repairs = restart_services(
-                    runner, decision.repair_services, cfg.watchdog.allowed_services
+                    runner,
+                    decision.repair_services,
+                    cfg.watchdog.allowed_services,
+                    panel_dir=cfg.install.panel_dir,
                 )
                 state = record_repair(state)
 
@@ -1339,7 +1423,9 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             print_json(last_data) if args.json else print(
                 json.dumps(last_data, ensure_ascii=False, indent=2)
             )
-        return ExitCode.OK if last_data["decision"]["healthy"] else ExitCode.CHECK_FAILED
+        return (
+            ExitCode.OK if last_data["decision"]["healthy"] else ExitCode.CHECK_FAILED
+        )
 
     raise ManagerError(f"Неизвестная команда: {cmd}")
 

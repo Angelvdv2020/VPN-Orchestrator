@@ -9,7 +9,7 @@ from .common import atomic_write, require_root, validate_domain
 
 SUB_COMPOSE = """services:
   remnawave-subscription-page:
-    image: remnawave/subscription-page:latest
+    image: remnawave/subscription-page:7.2.1
     container_name: remnawave-subscription-page
     hostname: remnawave-subscription-page
     restart: always
@@ -48,21 +48,32 @@ def install_subscription_page(
         return sub_dir
 
     sub_dir.mkdir(parents=True, exist_ok=True)
-    env = "\n".join([
-        "APP_PORT=3010",
-        "REMNAWAVE_PANEL_URL=http://remnawave:3000",
-        f"REMNAWAVE_API_TOKEN={api_token}",
-        "CUSTOM_SUB_PREFIX=",
-        "CADDY_AUTH_API_TOKEN=",
-        "TRUST_PROXY=1",
-        "",
-    ])
+    env = "\n".join(
+        [
+            "APP_PORT=3010",
+            "REMNAWAVE_PANEL_URL=http://remnawave:3000",
+            f"REMNAWAVE_API_TOKEN={api_token}",
+            "CUSTOM_SUB_PREFIX=",
+            "CADDY_AUTH_API_TOKEN=",
+            "TRUST_PROXY=1",
+            "",
+        ]
+    )
     atomic_write(sub_dir / ".env", env, 0o600)
     atomic_write(sub_dir / "docker-compose.yml", SUB_COMPOSE, 0o644)
-    runner.run(["docker", "compose", "-f", str(sub_dir / "docker-compose.yml"), "config", "-q"])
+    runner.run(
+        ["docker", "compose", "-f", str(sub_dir / "docker-compose.yml"), "config", "-q"]
+    )
     if start:
         runner.run(
-            ["docker", "compose", "-f", str(sub_dir / "docker-compose.yml"), "up", "-d"],
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(sub_dir / "docker-compose.yml"),
+                "up",
+                "-d",
+            ],
             timeout=max(600, cfg.manager.command_timeout_seconds),
         )
     return sub_dir

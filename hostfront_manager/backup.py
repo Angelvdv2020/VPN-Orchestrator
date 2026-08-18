@@ -5,14 +5,31 @@ import os
 import shutil
 import tarfile
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .config import AppConfig
 from .errors import BackupError
 
-
 MANIFEST = "manifest.json"
+FORBIDDEN_BROAD_PATHS = {Path("/"), Path("/etc/systemd/system")}
+MANAGER_SYSTEMD_UNITS = (
+    Path("/etc/systemd/system/hostfront-manager-web.service"),
+    Path("/etc/systemd/system/hostfront-manager-watchdog.service"),
+)
+
+
+def _scoped_backup_paths(paths: list[Path]) -> list[Path]:
+    """Migrate the legacy broad systemd path without backing up unrelated units."""
+    scoped: list[Path] = []
+    for path in paths:
+        if path == Path("/"):
+            raise BackupError("Слишком широкий backup path запрещён: /")
+        if path == Path("/etc/systemd/system"):
+            scoped.extend(MANAGER_SYSTEMD_UNITS)
+        else:
+            scoped.append(path)
+    return list(dict.fromkeys(scoped))
 
 
 def _backup_root(cfg: AppConfig) -> Path:
@@ -27,16 +44,17 @@ def _backup_root(cfg: AppConfig) -> Path:
 
 def create_backup(cfg: AppConfig, *, label: str = "manual") -> Path:
     root = _backup_root(cfg)
-    backup_id = datetime.now().strftime("%Y%m%d-%H%M%S") + f"-{label}"
+    backup_id = datetime.now(UTC).strftime("%Y%m%d-%H%M%S") + f"-{label}"
     archive = root / f"{backup_id}.tar.gz"
 
-    existing = [p for p in cfg.backup.paths if p.exists()]
+    paths = _scoped_backup_paths(cfg.backup.paths)
+    existing = [p for p in paths if p.exists()]
     if not existing:
         raise BackupError("Нет существующих путей для backup из [backup].paths")
 
     manifest = {
         "id": backup_id,
-        "created_at": datetime.now().isoformat(timespec="seconds"),
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "paths": [str(p) for p in existing],
         "hostname": os.uname().nodename if hasattr(os, "uname") else "",
     }
@@ -44,7 +62,9 @@ def create_backup(cfg: AppConfig, *, label: str = "manual") -> Path:
     try:
         with tempfile.TemporaryDirectory() as td:
             mp = Path(td) / MANIFEST
-            mp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            mp.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
             with tarfile.open(archive, "w:gz") as tf:
                 tf.add(mp, arcname=MANIFEST)
                 for p in existing:
@@ -95,6 +115,14 @@ def rollback(cfg: AppConfig, backup_id: str, *, dry_run: bool = False) -> list[s
                 raise BackupError("В backup нет manifest.json")
             manifest = json.loads(mf.read().decode("utf-8"))
             allowed = {str(Path(p)) for p in manifest.get("paths", [])}
+            forbidden = sorted(
+                str(p) for p in FORBIDDEN_BROAD_PATHS if str(p) in allowed
+            )
+            if forbidden:
+                raise BackupError(
+                    "Rollback широкого системного каталога запрещён: "
+                    + ", ".join(forbidden)
+                )
 
             for member in members:
                 if not member.name.startswith("rootfs/"):

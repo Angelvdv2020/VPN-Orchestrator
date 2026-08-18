@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..errors import ManagerError
 from ..shell import ShellRunner
 
 
@@ -38,7 +37,7 @@ def structural_validate(config: dict[str, Any]) -> list[str]:
         return errors
 
     tags: set[str] = set()
-    tcp_ports: set[tuple[str, int]] = set()
+    tcp_ports: list[tuple[str, int]] = []
 
     for idx, inbound in enumerate(inbounds):
         if not isinstance(inbound, dict):
@@ -76,7 +75,9 @@ def structural_validate(config: dict[str, Any]) -> list[str]:
 
         if method == "xhttp":
             xhttp = stream.get("xhttpSettings")
-            if not isinstance(xhttp, dict) or not str(xhttp.get("path", "")).startswith("/"):
+            if not isinstance(xhttp, dict) or not str(xhttp.get("path", "")).startswith(
+                "/"
+            ):
                 errors.append(f"{tag}: xhttpSettings.path отсутствует/некорректен")
 
         if protocol == "hysteria":
@@ -88,10 +89,20 @@ def structural_validate(config: dict[str, Any]) -> list[str]:
         # is intentionally only done for non-Hysteria listeners.
         if protocol != "hysteria" and isinstance(port, int):
             listen = str(inbound.get("listen", "0.0.0.0"))
-            key = (listen, port)
-            if key in tcp_ports:
-                errors.append(f"TCP listen collision: {listen}:{port}")
-            tcp_ports.add(key)
+            wildcard = {"0.0.0.0", "::", "[::]", "*", ""}
+            for used_listen, used_port in tcp_ports:
+                if used_port != port:
+                    continue
+                if (
+                    listen == used_listen
+                    or listen in wildcard
+                    or used_listen in wildcard
+                ):
+                    errors.append(
+                        f"TCP listen collision: {used_listen}:{port} conflicts with {listen}:{port}"
+                    )
+                    break
+            tcp_ports.append((listen, port))
 
     return errors
 
@@ -109,15 +120,17 @@ def validate_with_xray(
     binary = shutil.which(xray_binary)
     if not binary:
         return ValidationResult(
-            True,
+            False,
             [],
             False,
-            xray_stderr="xray binary not found; structural validation only",
+            xray_stderr="xray binary not found; full validation was not performed",
         )
 
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "config.json"
-        path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         result = runner.run(
             [binary, "run", "-test", "-c", str(path)],
             check=False,

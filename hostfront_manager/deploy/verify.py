@@ -3,9 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 from ..remnawave.client import RemnawaveClient
-from ..remnawave.shape import find_by_name
+from ..remnawave.shape import find_by_name, unwrap_list
 from ..rollback.sanitize import sanitize_update_object
-
 
 ROLLBACK_KINDS = {
     "config-profile": (
@@ -34,7 +33,7 @@ def verify_panel_after_apply(
     health_error = None
     try:
         health = client.get_system_health()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         health_error = str(exc)
 
     profiles = client.get_config_profiles()
@@ -42,23 +41,100 @@ def verify_panel_after_apply(
     squads = client.get_internal_squads()
     nodes = client.get_nodes()
 
-    # Presence checks are intentionally generic because response wrapping
-    # changed between Remnawave releases.
-    serialized = repr({
-        "profiles": profiles,
-        "hosts": hosts,
-        "squads": squads,
-    })
+    expected = set(expected_inbound_tags)
+    profile_rows = unwrap_list(
+        profiles, ("configProfiles", "config_profiles", "response", "data")
+    )
 
-    missing_tags = [tag for tag in expected_inbound_tags if tag not in serialized]
+    def inbound_rows(obj: dict[str, Any]) -> list[dict[str, Any]]:
+        rows = obj.get("inbounds")
+        if isinstance(rows, list):
+            return [x for x in rows if isinstance(x, dict)]
+        config = obj.get("config")
+        if isinstance(config, dict) and isinstance(config.get("inbounds"), list):
+            return [x for x in config["inbounds"] if isinstance(x, dict)]
+        return []
 
-    ok = health_error is None and not missing_tags
+    selected = None
+    tag_to_uuid: dict[str, str] = {}
+    for profile in profile_rows:
+        rows = inbound_rows(profile)
+        tags = {str(x.get("tag")) for x in rows if x.get("tag")}
+        if expected.issubset(tags):
+            selected = profile
+            tag_to_uuid = {
+                str(x["tag"]): str(x["uuid"])
+                for x in rows
+                if x.get("tag") in expected and x.get("uuid")
+            }
+            break
+
+    missing_tags = sorted(expected - set(tag_to_uuid))
+    expected_uuids = set(tag_to_uuid.values())
+
+    host_rows = unwrap_list(hosts, ("hosts", "response", "data"))
+    bound_uuids = {
+        str(row.get("inbound", {}).get("configProfileInboundUuid"))
+        for row in host_rows
+        if isinstance(row.get("inbound"), dict)
+        and row["inbound"].get("configProfileInboundUuid")
+    }
+    missing_host_bindings = sorted(
+        tag for tag, uuid in tag_to_uuid.items() if uuid not in bound_uuids
+    )
+
+    squad_rows = unwrap_list(
+        squads, ("internalSquads", "internal_squads", "response", "data")
+    )
+    squad_complete = any(
+        expected_uuids.issubset(
+            {str(x.get("uuid")) for x in row.get("inbounds", []) if isinstance(x, dict)}
+        )
+        for row in squad_rows
+        if isinstance(row.get("inbounds"), list)
+    )
+
+    node_rows = unwrap_list(nodes, ("nodes", "response", "data"))
+    connected = [
+        row
+        for row in node_rows
+        if row.get("isConnected") is True and row.get("isDisabled") is not True
+    ]
+    covered: set[str] = set()
+    for node in connected:
+        profile = node.get("configProfile")
+        if not isinstance(profile, dict):
+            continue
+        for inbound in profile.get("activeInbounds", []):
+            if isinstance(inbound, dict):
+                if inbound.get("uuid"):
+                    covered.add(str(inbound["uuid"]))
+            elif isinstance(inbound, str):
+                covered.add(inbound)
+    missing_node_coverage = sorted(
+        tag for tag, uuid in tag_to_uuid.items() if uuid not in covered
+    )
+
+    ok = (
+        health_error is None
+        and selected is not None
+        and not missing_tags
+        and not missing_host_bindings
+        and squad_complete
+        and bool(connected)
+        and not missing_node_coverage
+    )
     return {
         "ok": ok,
         "system_health": health,
         "health_error": health_error,
         "missing_inbound_tags": missing_tags,
-        "nodes_present": bool(nodes),
+        "profile_found": selected is not None,
+        "missing_host_bindings": missing_host_bindings,
+        "squad_complete": squad_complete,
+        "connected_nodes": len(connected),
+        "missing_node_coverage": missing_node_coverage,
+        "nodes_present": bool(node_rows),
     }
 
 
@@ -72,7 +148,7 @@ def verify_rollback_after_apply(
     health_error = None
     try:
         health = client.get_system_health()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         health_error = str(exc)
 
     live: dict[str, Any] = {}
@@ -91,24 +167,30 @@ def verify_rollback_after_apply(
         before = find_by_name(before_snapshot.get(snapshot_key), name, keys)
 
         if action == "create" and current is not None:
-            mismatches.append({
-                "kind": kind,
-                "name": name,
-                "reason": "created object still exists",
-            })
+            mismatches.append(
+                {
+                    "kind": kind,
+                    "name": name,
+                    "reason": "created object still exists",
+                }
+            )
         elif action == "update":
             if before is None or current is None:
-                mismatches.append({
-                    "kind": kind,
-                    "name": name,
-                    "reason": "snapshot or restored object is missing",
-                })
+                mismatches.append(
+                    {
+                        "kind": kind,
+                        "name": name,
+                        "reason": "snapshot or restored object is missing",
+                    }
+                )
             elif sanitize_update_object(current) != sanitize_update_object(before):
-                mismatches.append({
-                    "kind": kind,
-                    "name": name,
-                    "reason": "restored object differs from snapshot",
-                })
+                mismatches.append(
+                    {
+                        "kind": kind,
+                        "name": name,
+                        "reason": "restored object differs from snapshot",
+                    }
+                )
 
     return {
         "ok": health_error is None and not mismatches,

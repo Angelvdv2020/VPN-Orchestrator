@@ -6,6 +6,7 @@ PANEL_DOMAIN=""
 SUBSCRIPTION_DOMAIN=""
 SOURCE_DIR=""
 INSTALL_PANEL=1
+HOSTFRONT_REF="${HOSTFRONT_REF:-v4.0.0-rc.2}"
 
 usage() {
   echo "Usage: sudo bash install.sh --panel-domain panel.example.com --subscription-domain sub.example.com [--source DIR] [--manager-only]"
@@ -47,7 +48,7 @@ if [[ -n "$SOURCE_DIR" ]]; then
   [[ -f "$SOURCE_DIR/pyproject.toml" ]] || { echo "Invalid --source" >&2; exit 2; }
 else
   curl -fL --retry 3 \
-    https://github.com/Angelvdv2020/hostfront-manager/archive/refs/heads/main.tar.gz \
+    "https://github.com/Angelvdv2020/hostfront-manager/archive/refs/tags/${HOSTFRONT_REF}.tar.gz" \
     -o "$work_dir/source.tar.gz"
   tar -xzf "$work_dir/source.tar.gz" -C "$work_dir"
   SOURCE_DIR=$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d -name 'hostfront-manager-*' -print -quit)
@@ -60,12 +61,17 @@ python3 -m venv /opt/hostfront-manager/.venv
 /opt/hostfront-manager/.venv/bin/pip install "$SOURCE_DIR"
 ln -sfn /opt/hostfront-manager/.venv/bin/hostfront-manager /usr/local/bin/hostfront-manager
 
-sed \
-  -e "s#https://panel.example.com#https://${PANEL_DOMAIN}#g" \
-  -e "s#panel.example.com#${PANEL_DOMAIN}#g" \
-  -e "s#sub.example.com#${SUBSCRIPTION_DOMAIN}#g" \
-  "$SOURCE_DIR/deploy/production.example.toml" > /etc/hostfront-manager/config.toml
-chmod 0644 /etc/hostfront-manager/config.toml
+if [[ -e /etc/hostfront-manager/config.toml ]]; then
+  echo "Preserving existing /etc/hostfront-manager/config.toml"
+else
+  config_tmp="$work_dir/config.toml"
+  sed \
+    -e "s#https://panel.example.com#https://${PANEL_DOMAIN}#g" \
+    -e "s#panel.example.com#${PANEL_DOMAIN}#g" \
+    -e "s#sub.example.com#${SUBSCRIPTION_DOMAIN}#g" \
+    "$SOURCE_DIR/deploy/production.example.toml" > "$config_tmp"
+  install -m 0644 "$config_tmp" /etc/hostfront-manager/config.toml
+fi
 
 if [[ ! -e /etc/hostfront-manager/secrets.env ]]; then
   /opt/hostfront-manager/.venv/bin/hostfront-manager \

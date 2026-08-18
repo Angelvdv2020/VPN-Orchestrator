@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
 from typing import Any
 
 
@@ -21,7 +20,9 @@ class RealitySettings:
             raise ValueError("REALITY private_key пуст")
         sid = self.short_id.strip().lower()
         if len(sid) > 16 or len(sid) % 2 != 0:
-            raise ValueError("REALITY short_id должен содержать чётное число hex-символов, максимум 16")
+            raise ValueError(
+                "REALITY short_id должен содержать чётное число hex-символов, максимум 16"
+            )
         if sid and any(ch not in "0123456789abcdef" for ch in sid):
             raise ValueError("REALITY short_id должен быть hex")
 
@@ -36,7 +37,9 @@ class MobileProfileSettings:
     reality_raw_port: int = 8443
     hysteria_port: int = 443
     host_front_local_port: int = 9443
-    host_front_listen: str = "127.0.0.1"
+    # Caddy is deployed in Docker and reaches the host through the default
+    # bridge gateway. 127.0.0.1 would point back to the Caddy container.
+    host_front_listen: str = "172.18.0.1"
     host_front_external_port: int = 443
     xhttp_path: str = "/mobile"
     host_front_path: str = "/edge"
