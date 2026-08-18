@@ -3,6 +3,7 @@ from __future__ import annotations
 import getpass
 import os
 import re
+import secrets
 from pathlib import Path
 
 from .config import AppConfig
@@ -73,6 +74,34 @@ def _ask(
         print(f"{YELLOW}  Поле обязательно, введите значение.{RESET}")
 
 
+def _ask_int(prompt: str, *, default: int, minimum: int = 1, maximum: int = 65535) -> int:
+    """Read a numeric value and let the user correct invalid input."""
+    while True:
+        raw = _ask(prompt, default=str(default), required=True)
+        try:
+            value = int(raw)
+        except ValueError:
+            print(f"{YELLOW}  Введите целое число от {minimum} до {maximum}. Попробуйте ещё раз.{RESET}")
+            continue
+        if minimum <= value <= maximum:
+            return value
+        print(f"{YELLOW}  Значение должно быть от {minimum} до {maximum}. Попробуйте ещё раз.{RESET}")
+
+
+def _retry_step(label: str, action):
+    """Retry recoverable installation/network errors instead of exiting immediately."""
+    while True:
+        try:
+            return action()
+        except (ManagerError, OSError, RuntimeError) as exc:
+            print(f"\n{YELLOW}Ошибка на этапе «{label}»: {exc}{RESET}")
+            answer = input(
+                f"{CYAN}  › Исправьте причину и нажмите Enter для повтора (или n для выхода): {RESET}"
+            ).strip().lower()
+            if answer in {"n", "нет", "no", "q", "выход"}:
+                raise ManagerError(f"Мастер остановлен на этапе «{label}»: {exc}") from exc
+
+
 def _save_secret(path: Path, name: str, value: str) -> None:
     if not value or any(x in value for x in "\r\n"):
         raise ManagerError(f"Пустой или небезопасный секрет: {name}")
@@ -106,15 +135,16 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     profile_name = _ask("Название профиля и подписки", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
-    xhttp_port = int(_ask("Порт REALITY XHTTP", default="8443"))
-    raw_port = int(_ask("Порт REALITY RAW", default="8444"))
-    hysteria_port = int(_ask("Порт Hysteria2 UDP", default="8445"))
-    front_port = int(_ask("Публичный порт front", default="443"))
+    xhttp_port = _ask_int("Порт REALITY XHTTP", default=8443)
+    raw_port = _ask_int("Порт REALITY RAW", default=8444)
+    hysteria_port = _ask_int("Порт Hysteria2 UDP", default=8445)
+    front_port = _ask_int("Публичный порт front", default=443)
     _section(2, "Доступ к нодам")
     edge_host = _ask("IP/hostname edge-сервера", required=True)
     front_host = _ask("IP/hostname front-сервера", required=True)
-    edge_node_secret = _ask("Node Secret edge", secret=True)
-    front_node_secret = _ask("Node Secret front", secret=True)
+    edge_node_secret = secrets.token_hex(32)
+    front_node_secret = secrets.token_hex(32)
+    print(f"{GREEN}✓ Node Secret edge/front сгенерированы автоматически и сохранены только в конфигурации.{RESET}")
 
     # A single address for both roles is the supported local test mode. In that
     # mode no private SSH key is required on the Manager host.
@@ -135,11 +165,11 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
                 enable_net_admin=cfg.nodes.enable_net_admin,
             )
         )
-        _deploy_local_node(cfg, runner, local_compose)
+        _retry_step("локальный запуск ноды", lambda: _deploy_local_node(cfg, runner, local_compose))
         endpoints = ()
     else:
         ssh_user = _ask("SSH user для нод", default="root")
-        ssh_port = int(_ask("SSH port для нод", default="22"))
+        ssh_port = _ask_int("SSH port для нод", default=22)
         identity = _ask("Путь к SSH private key", default="/root/.ssh/hostfront-edge")
     if not same_machine and edge_host == front_host:
         print(
@@ -149,16 +179,19 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         endpoints = (endpoints[0],)
     for role, host, secret in endpoints:
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
-        ssh_test(runner, target)
-        remote_prepare(runner, target)
-        compose = build_node_compose(
-            NodeRuntimeSpec(
-                node_port=cfg.nodes.default_node_port,
-                secret_key=secret,
-                enable_net_admin=cfg.nodes.enable_net_admin,
+        def deploy_one():
+            ssh_test(runner, target)
+            remote_prepare(runner, target)
+            compose = build_node_compose(
+                NodeRuntimeSpec(
+                    node_port=cfg.nodes.default_node_port,
+                    secret_key=secret,
+                    enable_net_admin=cfg.nodes.enable_net_admin,
+                )
             )
-        )
-        deploy_compose(runner, target, compose, start=True)
+            deploy_compose(runner, target, compose, start=True)
+
+        _retry_step(f"подготовка {role}-ноды ({host})", deploy_one)
         print(f"Нода {role} подготовлена: {host}")
 
     _section(3, "Ключи транспортов")
@@ -170,13 +203,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     hysteria_auth = _ask("Hysteria2 auth", secret=True)
 
     plan = InstallPlan(panel, subscription, True)
-    installation = install_all(cfg, runner, plan)
+    installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
 
     _section(4, "Remnawave")
     token = _ask("Remnawave API token", secret=True)
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
-    installation = install_all(cfg, runner, plan)
+    installation = _retry_step("проверка установки после сохранения токена", lambda: install_all(cfg, runner, plan))
 
     _section(5, "Сборка профиля")
     settings = MobileProfileSettings(
