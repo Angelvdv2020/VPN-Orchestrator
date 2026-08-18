@@ -156,7 +156,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     if same_machine:
         print(
             f"{YELLOW}Edge и front находятся на этом же сервере; SSH не нужен, "
-            "нода будет запущена локально.{RESET}"
+            f"нода будет запущена локально.{RESET}"
         )
         local_compose = build_node_compose(
             NodeRuntimeSpec(
@@ -174,7 +174,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     if not same_machine and edge_host == front_host:
         print(
             f"{YELLOW}Одна машина указана для edge и front; SSH-развёртывание "
-            "ноды выполняется один раз после настройки портов.{RESET}"
+            f"ноды выполняется один раз после настройки портов.{RESET}"
         )
         endpoints = (endpoints[0],)
     for role, host, secret in endpoints:
