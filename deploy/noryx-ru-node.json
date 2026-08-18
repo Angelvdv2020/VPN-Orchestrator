@@ -1,0 +1,12 @@
+{
+  "name": "Noryx-RU-Ingress",
+  "address": "95.214.63.141",
+  "port": 2222,
+  "note": "Russian mobile ingress, ru.noryx.ru",
+  "countryCode": "RU",
+  "tags": ["FRONT", "RU_INGRESS"],
+  "configProfile": {
+    "activeConfigProfileUuid": "06527ae2-48a4-4fdb-9c66-3cbb8a21c48c",
+    "activeInbounds": ["257d0870-9ab2-439e-bce2-84ad1c2bd791"]
+  }
+}

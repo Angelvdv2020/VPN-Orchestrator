@@ -1,0 +1,94 @@
+https://app.noryxvpn.store {
+	reverse_proxy * http://remnawave:3000
+}
+
+https://sub.noryxvpn.store {
+	handle_path /__source-key-probe/* {
+		reverse_proxy http://source-key-probe:18081
+	}
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy http://remnawave:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port 443
+		}
+	}
+
+	@raw_sub path /sub /sub/*
+	handle @raw_sub {
+		reverse_proxy http://remnawave:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port 443
+		}
+	}
+
+	@singbox_alias path_regexp singboxAlias ^/([A-Za-z0-9_-]{6,64})/sing-box$
+	handle @singbox_alias {
+		rewrite * /api/sub/{re.singboxAlias.1}/singbox
+		reverse_proxy http://remnawave:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port 443
+		}
+	}
+
+	@subscription_client {
+		not header Accept *text/html*
+		path_regexp subscriptionPath ^/[A-Za-z0-9_-]{6,64}(?:/[A-Za-z0-9_-]+)?$
+	}
+	handle @subscription_client {
+		rewrite * /api/sub{uri}
+		reverse_proxy http://remnawave:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port 443
+		}
+	}
+
+	handle {
+		reverse_proxy * http://remnawave-subscription-page:3010 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Port 443
+		}
+	}
+}
+
+https://ru2.noryx.ru {
+	@mobile path /edge*
+	handle @mobile {
+		reverse_proxy 172.18.0.1:9443 {
+			flush_interval -1
+			transport http {
+				versions h2c 2
+			}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+:443 {
+	tls internal
+	respond 204
+}
