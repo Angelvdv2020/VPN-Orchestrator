@@ -37,7 +37,7 @@ class TelemetryInput(BaseModel):
 
 def create_app(cfg: AppConfig) -> FastAPI:
     app = FastAPI(
-        title="HostFront Manager", version=__version__, docs_url=None, redoc_url=None
+        title="VPN Orchestrator", version=__version__, docs_url=None, redoc_url=None
     )
     store = TelemetryStore(cfg.web.telemetry_db)
 

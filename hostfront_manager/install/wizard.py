@@ -18,7 +18,7 @@ class InstallPlan:
 
 
 def interactive_plan() -> InstallPlan:
-    print("=== HostFront Manager — первоначальная установка ===")
+    print("=== VPN Orchestrator — первоначальная установка ===")
     panel = validate_domain(input("Домен панели (panel.example.com): "))
     sub_raw = input("Домен страницы подписки (sub.example.com): ").strip()
     sub = validate_domain(sub_raw) if sub_raw else panel

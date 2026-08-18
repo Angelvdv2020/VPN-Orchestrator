@@ -1,10 +1,10 @@
-# Топология HostFront
+# Топология VPN Orchestrator
 
 | Домен | IP | Назначение |
 |---|---|---|
 | `panel.example.com` | `203.0.113.10` | Remnawave Panel |
 | `sub.example.com` | `203.0.113.10` | Subscription Page |
-| `manager.example.com` | `203.0.113.10` | HostFront Manager API и dashboard |
+| `manager.example.com` | `203.0.113.10` | VPN Orchestrator API и dashboard |
 | `front.example.com` | `203.0.113.10` | HOST-FRONT XHTTP/TLS |
 | `edge.example.com` | `203.0.113.11` | edge: REALITY XHTTP/RAW и Hysteria2 |
 

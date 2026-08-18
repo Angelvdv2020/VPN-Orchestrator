@@ -1,6 +1,6 @@
-# HostFront Manager
+# VPN Orchestrator
 
-HostFront Manager — система автоматизации собственной VPN-инфраструктуры на
+VPN Orchestrator — система автоматизации собственной VPN-инфраструктуры на
 Remnawave, рассчитанная на нестабильные и фильтруемые мобильные сети. Manager
 устанавливает компоненты, управляет нодами и профилями, собирает телеметрию,
 проверяет состояние инфраструктуры и безопасно откатывает неудачные изменения.
@@ -28,7 +28,7 @@ preflight-проверку свободного порта и runtime-прове
 
 ## Быстрый старт для новичков
 
-HostFront Manager помогает установить и управлять собственной VPN-инфраструктурой:
+VPN Orchestrator помогает установить и управлять собственной VPN-инфраструктурой:
 
 - ⚙️ установить нужные компоненты;
 - 🌍 добавить VPN-серверы;
@@ -49,7 +49,7 @@ HostFront Manager помогает установить и управлять с
 схема выглядит так:
 
 ```text
-🖥 Сервер 1: панель + HostFront Manager + подписки
+🖥 Сервер 1: панель + VPN Orchestrator + подписки
                          ↓
 🌍 Сервер 2: VPN-нода
 ```
@@ -59,7 +59,7 @@ HostFront Manager помогает установить и управлять с
 На основном сервере выполните одну команду:
 
 ```bash
-git clone https://github.com/Angelvdv2020/hostfront-manager.git
+git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
 cd hostfront-manager
 
 sudo bash install.sh \
@@ -193,7 +193,7 @@ sudo hostfront-manager self-test
 
 Типовая схема без мобильных allowlist состоит из двух серверов:
 
-- **Manager/front** — Remnawave Panel, Subscription Page, HostFront Manager,
+- **Manager/front** — Remnawave Panel, Subscription Page, VPN Orchestrator,
   Caddy и front-нода для HOST-FRONT;
 - **edge** — Remnawave Node с REALITY XHTTP, REALITY RAW и Hysteria2.
 
@@ -249,7 +249,7 @@ TCP 2222 разрешён firewall только для IP панели `203.0.11
 ## Установка
 
 ```bash
-git clone https://github.com/Angelvdv2020/hostfront-manager.git
+git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
 cd hostfront-manager
 sudo bash install.sh \
   --panel-domain panel.example.com \
@@ -524,7 +524,7 @@ HOST-FRONT — отдельный резервный транспорт, а не
 |---|---|---|
 | `panel.example.com` | Remnawave Panel | Manager/front |
 | `sub.example.com` | подписки | Manager/front |
-| `manager.example.com` | HostFront Manager | Manager/front |
+| `manager.example.com` | VPN Orchestrator | Manager/front |
 | `front.example.com` | HOST-FRONT | Manager/front |
 | `edge.example.com` | edge-нода | Edge |
 
@@ -543,7 +543,7 @@ getent ahostsv4 edge.example.com
 ### 3. Установка Manager/front
 
 ```bash
-git clone https://github.com/Angelvdv2020/hostfront-manager.git
+git clone https://github.com/Angelvdv2020/VPN-Orchestrator.git
 cd hostfront-manager
 sudo bash install.sh \
   --panel-domain panel.example.com \
@@ -568,7 +568,7 @@ sudo hostfront-manager secret-set REMNAWAVE_TOKEN
 sudo systemctl restart hostfront-manager-web hostfront-manager-watchdog
 ```
 
-API-токен Remnawave и административный токен HostFront Manager — разные
+API-токен Remnawave и административный токен VPN Orchestrator — разные
 секреты. Не добавляйте их в команды, README и историю shell.
 
 ### 4. Установка edge-ноды

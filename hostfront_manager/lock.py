@@ -35,7 +35,7 @@ class ProcessLock:
         try:
             fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise LockError("HostFront Manager уже запущен в другом процессе") from exc
+            raise LockError("VPN Orchestrator уже запущен в другом процессе") from exc
 
         self._fh.write(str(__import__("os").getpid()))
         self._fh.flush()

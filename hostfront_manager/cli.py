@@ -275,8 +275,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _menu() -> str:
     print()
-    print("=== HostFront Console ===")
-    print("Консольная панель управления HostFront/VPN-инфраструктурой")
+    print("=== VPN Orchestrator ===")
+    print("Консольная панель управления VPN-инфраструктурой")
     print("1. Состояние сервера")
     print("2. Полная диагностика")
     print("3. Самопроверка Manager")
@@ -1480,7 +1480,7 @@ def entrypoint() -> None:
         raise SystemExit(ExitCode.INVALID_CONFIG)
 
     logger, log_file = setup_logging(cfg.manager.log_dir, debug=args.debug)
-    logger.debug("HostFront Manager %s start", __version__)
+    logger.debug("VPN Orchestrator %s start", __version__)
 
     try:
         if args.command == "web-serve":

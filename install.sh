@@ -48,10 +48,10 @@ if [[ -n "$SOURCE_DIR" ]]; then
   [[ -f "$SOURCE_DIR/pyproject.toml" ]] || { echo "Invalid --source" >&2; exit 2; }
 else
   curl -fL --retry 3 \
-    "https://github.com/Angelvdv2020/hostfront-manager/archive/refs/tags/${HOSTFRONT_REF}.tar.gz" \
+    "https://github.com/Angelvdv2020/VPN-Orchestrator/archive/refs/tags/${HOSTFRONT_REF}.tar.gz" \
     -o "$work_dir/source.tar.gz"
   tar -xzf "$work_dir/source.tar.gz" -C "$work_dir"
-  SOURCE_DIR=$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d -name 'hostfront-manager-*' -print -quit)
+  SOURCE_DIR=$(find "$work_dir" -mindepth 1 -maxdepth 1 -type d -name 'VPN-Orchestrator-*' -print -quit)
 fi
 
 install -d -m 0755 /opt/hostfront-manager /etc/hostfront-manager \
@@ -97,7 +97,7 @@ if [[ "$INSTALL_PANEL" -eq 1 ]]; then
 fi
 
 echo
-echo "HostFront Manager installed."
+echo "VPN Orchestrator installed."
 echo "Panel: https://${PANEL_DOMAIN}"
 echo "Console: sudo hostfront-manager"
 echo "Next: create a Remnawave API token and run 'hostfront-manager secret-set REMNAWAVE_TOKEN'."

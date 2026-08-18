@@ -30,7 +30,7 @@ Restart=on-failure
 RestartSec=10s
 """
     watchdog = (
-        "[Unit]\nDescription=HostFront Manager Watchdog\n"
+        "[Unit]\nDescription=VPN Orchestrator Watchdog\n"
         + common.split("[Unit]\n", 1)[1]
         + (
             f"ExecStart={executable} --config {config_path} watchdog-run\n\n[Install]\nWantedBy=multi-user.target\n"
@@ -38,7 +38,7 @@ RestartSec=10s
     )
     web_common = common.replace("User=root", "User=hostfront-manager")
     web = (
-        "[Unit]\nDescription=HostFront Manager Web API\n"
+        "[Unit]\nDescription=VPN Orchestrator Web API\n"
         + web_common.split("[Unit]\n", 1)[1]
         + (
             f"ExecStart={executable} --config {config_path} web-serve\n\n[Install]\nWantedBy=multi-user.target\n"

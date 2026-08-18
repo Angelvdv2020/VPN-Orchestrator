@@ -12,7 +12,7 @@ def print_json(data: Any) -> None:
 
 
 def render_status(state: HostState) -> None:
-    print("=== HostFront Manager v4 ===")
+    print("=== VPN Orchestrator v4 ===")
     print(f"Host:       {state.hostname}")
     print(f"OS:         {state.os_name}")
     print(f"Kernel:     {state.kernel}")
