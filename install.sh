@@ -6,7 +6,7 @@ PANEL_DOMAIN=""
 SUBSCRIPTION_DOMAIN=""
 SOURCE_DIR=""
 INSTALL_PANEL=1
-HOSTFRONT_REF="${HOSTFRONT_REF:-v4.0.0-rc.2}"
+HOSTFRONT_REF="${HOSTFRONT_REF:-v4.0.0-rc.3}"
 
 usage() {
   echo "Usage: sudo bash install.sh --panel-domain panel.example.com --subscription-domain sub.example.com [--source DIR] [--manager-only]"
@@ -56,6 +56,10 @@ fi
 
 install -d -m 0755 /opt/hostfront-manager /etc/hostfront-manager \
   /var/lib/hostfront-manager /var/log/hostfront-manager /var/backups/hostfront-manager
+if ! id -u hostfront-manager >/dev/null 2>&1; then
+  useradd --system --home-dir /var/lib/hostfront-manager --shell /usr/sbin/nologin hostfront-manager
+fi
+chown -R hostfront-manager:hostfront-manager /var/lib/hostfront-manager /var/log/hostfront-manager
 python3 -m venv /opt/hostfront-manager/.venv
 /opt/hostfront-manager/.venv/bin/pip install --upgrade pip
 /opt/hostfront-manager/.venv/bin/pip install "$SOURCE_DIR"

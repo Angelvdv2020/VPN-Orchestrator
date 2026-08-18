@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import fcntl
+import os
+import stat
 from pathlib import Path
 
 from .errors import LockError
@@ -14,10 +16,21 @@ class ProcessLock:
     def __enter__(self):
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._fh = self.path.open("w")
-        except PermissionError:
-            fallback = Path("/tmp/hostfront-manager.lock")
-            self._fh = fallback.open("w")
+            fd = os.open(
+                self.path,
+                os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                os.close(fd)
+                raise LockError(f"Lock path не является обычным файлом: {self.path}")
+            os.fchmod(fd, 0o600)
+            self._fh = os.fdopen(fd, "r+", encoding="ascii")
+        except (OSError, PermissionError) as exc:
+            raise LockError(
+                f"Не удалось безопасно создать lock {self.path}: {exc}"
+            ) from exc
 
         try:
             fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

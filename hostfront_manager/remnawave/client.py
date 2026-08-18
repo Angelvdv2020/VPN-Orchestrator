@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,6 +22,7 @@ class RemnawaveClient:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        self._opener = urllib.request.build_opener()
 
     def request(
         self,
@@ -46,21 +48,37 @@ class RemnawaveClient:
             payload = json.dumps(body).encode("utf-8")
             headers["Content-Type"] = "application/json"
 
-        req = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                raw = resp.read().decode("utf-8", "replace")
-                try:
-                    data = json.loads(raw) if raw else None
-                except json.JSONDecodeError:
-                    data = raw
-                return ApiResponse(resp.status, data)
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", "replace")
-            raise ManagerError(f"Remnawave API HTTP {exc.code}: {raw[:800]}") from exc
-        except urllib.error.URLError as exc:
-            raise ManagerError(f"Remnawave API недоступен: {exc}") from exc
-
+        req = urllib.request.Request(
+            url, data=payload, headers=headers, method=method.upper()
+        )
+        attempts = 3 if method.upper() == "GET" else 1
+        for attempt in range(attempts):
+            try:
+                with self._opener.open(req, timeout=self.timeout) as resp:
+                    raw = resp.read().decode("utf-8", "replace")
+                    try:
+                        data = json.loads(raw) if raw else None
+                    except json.JSONDecodeError:
+                        data = raw
+                    return ApiResponse(resp.status, data)
+            except urllib.error.HTTPError as exc:
+                raw = exc.read().decode("utf-8", "replace")
+                if (
+                    method.upper() == "GET"
+                    and exc.code in {502, 503, 504}
+                    and attempt + 1 < attempts
+                ):
+                    time.sleep(0.2 * (attempt + 1))
+                    continue
+                raise ManagerError(
+                    f"Remnawave API HTTP {exc.code}: {raw[:800]}"
+                ) from exc
+            except urllib.error.URLError as exc:
+                if method.upper() == "GET" and attempt + 1 < attempts:
+                    time.sleep(0.2 * (attempt + 1))
+                    continue
+                raise ManagerError(f"Remnawave API недоступен: {exc}") from exc
+        raise ManagerError("Remnawave API недоступен после повторных попыток")
 
     def get_node(self, uuid: str) -> Any:
         return self.request("GET", f"/api/nodes/{uuid}").data
@@ -80,7 +98,6 @@ class RemnawaveClient:
 
     def disable_node(self, uuid: str) -> Any:
         return self.request("POST", f"/api/nodes/{uuid}/actions/disable").data
-
 
     def get_system_metadata(self) -> Any:
         return self.request("GET", "/api/system/metadata").data
@@ -125,8 +142,9 @@ class RemnawaveClient:
         return self.request("GET", "/api/hosts").data
 
     def get_users(self, *, size: int = 1000, start: int = 0) -> Any:
-        return self.request("GET", "/api/users", query={"size": size, "start": start}).data
-
+        return self.request(
+            "GET", "/api/users", query={"size": size, "start": start}
+        ).data
 
     def create_config_profile(self, payload: dict[str, Any]) -> Any:
         return self.request("POST", "/api/config-profiles", body=payload).data

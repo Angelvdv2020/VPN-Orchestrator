@@ -70,7 +70,7 @@ def _check_dns(name: str, domain: str) -> CheckResult:
         return CheckResult(name, False, f"{domain}: DNS ошибка: {exc}")
 
 
-def _check_tcp_port(port: int) -> CheckResult:
+def _check_tcp_port_free(port: int) -> CheckResult:
     # Проверяем локальный listen через bind. EADDRINUSE обычно означает,
     # что порт уже занят сервисом. Это не заменяет внешний health-check.
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -96,6 +96,41 @@ def _check_tcp_port(port: int) -> CheckResult:
         sock.close()
 
 
+def _check_tcp_listener(port: int) -> CheckResult:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.5)
+    try:
+        result = sock.connect_ex(("127.0.0.1", port))
+        ok = result == 0
+        return CheckResult(
+            f"runtime-tcp:{port}",
+            ok,
+            f"TCP/{port} listener доступен"
+            if ok
+            else f"TCP/{port} listener отсутствует",
+            {"state": "listening" if ok else "down", "connect_errno": result},
+            critical=True,
+        )
+    finally:
+        sock.close()
+
+
+def _check_udp_listener(port: int) -> CheckResult:
+    try:
+        rows = Path("/proc/net/udp").read_text(encoding="ascii").splitlines()[1:]
+        needle = f":{port:04X}"
+        ok = any(needle in row.split()[1] for row in rows if len(row.split()) > 1)
+    except OSError as exc:
+        return CheckResult(f"runtime-udp:{port}", False, str(exc), critical=True)
+    return CheckResult(
+        f"runtime-udp:{port}",
+        ok,
+        f"UDP/{port} listener обнаружен" if ok else f"UDP/{port} listener отсутствует",
+        {"state": "listening" if ok else "down"},
+        critical=True,
+    )
+
+
 def run_doctor(cfg: AppConfig) -> DoctorReport:
     checks = [
         _check_root(cfg),
@@ -105,7 +140,9 @@ def run_doctor(cfg: AppConfig) -> DoctorReport:
         _check_dns("dns:panel", cfg.domains.panel),
         _check_dns("dns:subscription", cfg.domains.subscription),
     ]
-    checks.extend(_check_tcp_port(p) for p in cfg.checks.tcp_ports)
+    checks.extend(_check_tcp_port_free(p) for p in cfg.checks.tcp_ports)
+    checks.extend(_check_tcp_listener(p) for p in cfg.watchdog.expected_tcp_ports)
+    checks.extend(_check_udp_listener(p) for p in cfg.watchdog.expected_udp_ports)
 
     if cfg.remnawave.enabled:
         token_ok = bool(cfg.remnawave.token())

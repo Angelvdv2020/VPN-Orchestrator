@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -73,9 +74,25 @@ def create_app(cfg: AppConfig) -> FastAPI:
         )
         return response
 
+    @app.get("/livez")
+    def livez():
+        return {"ok": True, "version": __version__}
+
+    @app.get("/readyz")
+    def readyz():
+        try:
+            store.connect()
+            cfg.mobile.state_file.parent.mkdir(parents=True, exist_ok=True)
+            return {"ok": True, "version": __version__}
+        except (OSError, sqlite3.Error) as exc:
+            return JSONResponse(
+                {"ok": False, "version": __version__, "error": str(exc)},
+                status_code=503,
+            )
+
     @app.get("/healthz")
     def healthz():
-        return {"ok": True, "version": __version__}
+        return readyz()
 
     @app.post("/api/v1/telemetry", status_code=202)
     async def telemetry(
@@ -107,19 +124,9 @@ def create_app(cfg: AppConfig) -> FastAPI:
             )
             payload = TelemetryInput.model_validate_json(body)
             row_id = store.add(x_device_id, x_nonce, payload.model_dump())
-            mobile_store = MobileStateStore(cfg.mobile.state_file)
-            if payload.path_id in {x.id for x in mobile_store.paths()}:
-                mobile_store.add_sample(
-                    ProbeSample.now(
-                        payload.path_id,
-                        ProbeStatus(payload.status),
-                        latency_ms=payload.latency_ms,
-                        source=f"telemetry:{x_device_id}",
-                        detail=payload.detail,
-                        network_kind=NetworkKind(payload.network),
-                    )
-                )
-            store.prune(int(time.time()) - cfg.web.telemetry_retention_days * 86400)
+            store.prune_if_due(
+                int(time.time()) - cfg.web.telemetry_retention_days * 86400
+            )
         except sqlite3.IntegrityError:
             raise HTTPException(409, "Telemetry nonce already used")
         except ManagerError as exc:
@@ -175,7 +182,20 @@ def create_app(cfg: AppConfig) -> FastAPI:
             raise HTTPException(409, "Mobile profile is not initialized")
         result = recommend(
             paths,
-            mobile_store.samples(),
+            [
+                ProbeSample(
+                    path_id=row["path_id"],
+                    status=ProbeStatus(row["status"]),
+                    checked_at=datetime.fromtimestamp(
+                        row["received_at"], UTC
+                    ).isoformat(),
+                    latency_ms=row["latency_ms"],
+                    source=f"telemetry:{row['device_id']}",
+                    detail=row["detail"],
+                    network_kind=NetworkKind(row["network"]),
+                )
+                for row in store.samples()
+            ],
             network_kind=NetworkKind(network),
             failure_penalty=cfg.mobile.failure_penalty,
             stale_after_seconds=cfg.mobile.stale_after_seconds,

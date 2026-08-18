@@ -72,6 +72,8 @@ max_repairs_per_window = 3
 auto_repair = false
 unattended_repair = false
 allowed_services = ["docker", "remnawave"]
+expected_tcp_ports = [443]
+expected_udp_ports = []
 
 [web]
 enabled = true

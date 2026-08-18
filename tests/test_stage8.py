@@ -7,10 +7,13 @@ from hostfront_manager.watchdog.store import WatchdogStore
 
 
 def config(**values):
-    defaults = dict(
-        state_file=Path("state.json"), failure_threshold=2,
-        recovery_threshold=2, cooldown_seconds=60,
-        repair_window_seconds=300, max_repairs_per_window=2,
+    defaults = dict(  # noqa: C408 - test fixture keeps keyword layout readable
+        state_file=Path("state.json"),
+        failure_threshold=2,
+        recovery_threshold=2,
+        cooldown_seconds=60,
+        repair_window_seconds=300,
+        max_repairs_per_window=2,
     )
     defaults.update(values)
     return WatchdogSection(**defaults)
@@ -53,3 +56,9 @@ def test_store_roundtrip(tmp_path):
     store = WatchdogStore(tmp_path / "nested" / "state.json")
     store.save({"state": "healthy", "failure_streak": 0})
     assert store.load()["state"] == "healthy"
+
+
+def test_watchdog_config_has_runtime_listener_ports():
+    cfg = config(expected_tcp_ports=[443], expected_udp_ports=[443])
+    assert cfg.expected_tcp_ports == [443]
+    assert cfg.expected_udp_ports == [443]

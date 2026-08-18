@@ -25,3 +25,11 @@ def test_failure_is_recorded_for_active_transaction(tmp_path):
     manifest = json.loads((tx.path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["status"] == "failed"
     assert manifest["error"] == "network error"
+
+
+def test_journal_uses_private_atomic_files(tmp_path):
+    journal = TransactionJournal(tmp_path)
+    tx = journal.begin("deploy")
+    assert tmp_path.stat().st_mode & 0o777 == 0o700
+    assert (tx.path / "manifest.json").stat().st_mode & 0o777 == 0o600
+    assert not list(tmp_path.glob(".*manifest.json.*"))

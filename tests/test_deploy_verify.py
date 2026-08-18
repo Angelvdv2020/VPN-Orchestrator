@@ -63,3 +63,31 @@ def test_verify_checks_relationships_and_connected_coverage():
         is False
     )
     assert verify_panel_after_apply(Client(connected=False), ["A", "B"])["ok"] is False
+
+
+def test_verify_rejects_wrong_role_distribution():
+    client = Client()
+    client.get_nodes = lambda: {
+        "response": [
+            {
+                "uuid": "edge",
+                "isConnected": True,
+                "isDisabled": False,
+                "configProfile": {"activeInbounds": [{"uuid": "i1"}]},
+            },
+            {
+                "uuid": "front",
+                "isConnected": True,
+                "isDisabled": False,
+                "configProfile": {"activeInbounds": [{"uuid": "i2"}]},
+            },
+        ]
+    }
+    result = verify_panel_after_apply(
+        client,
+        ["A", "B"],
+        expected_role_nodes={"edge": "edge", "front": "front"},
+        role_inbound_tags={"edge": ["A", "B"], "front": []},
+    )
+    assert result["ok"] is False
+    assert result["role_checks"]["edge"]["missing_tags"] == ["B"]

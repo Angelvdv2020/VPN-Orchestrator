@@ -100,6 +100,8 @@ class WatchdogSection:
     auto_repair: bool = False
     unattended_repair: bool = False
     allowed_services: list[str] = field(default_factory=lambda: ["docker", "remnawave"])
+    expected_tcp_ports: list[int] = field(default_factory=list)
+    expected_udp_ports: list[int] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -209,11 +211,15 @@ def load_config(path: Path | None) -> AppConfig:
     mo = raw.get("mobile", {})
     cfg.mobile = MobileSection(
         enabled=bool(mo.get("enabled", True)),
-        state_file=_path(mo.get("state_file", "/var/lib/hostfront-manager/mobile-state.json")),
+        state_file=_path(
+            mo.get("state_file", "/var/lib/hostfront-manager/mobile-state.json")
+        ),
         probe_timeout_seconds=float(mo.get("probe_timeout_seconds", 3.0)),
         failure_penalty=int(mo.get("failure_penalty", 18)),
         stale_after_seconds=int(mo.get("stale_after_seconds", 900)),
-        prefer_tcp_on_unknown_network=bool(mo.get("prefer_tcp_on_unknown_network", True)),
+        prefer_tcp_on_unknown_network=bool(
+            mo.get("prefer_tcp_on_unknown_network", True)
+        ),
     )
     if cfg.mobile.probe_timeout_seconds <= 0:
         raise ConfigError("mobile.probe_timeout_seconds должен быть > 0")
@@ -236,20 +242,30 @@ def load_config(path: Path | None) -> AppConfig:
 
     de = raw.get("deploy", {})
     cfg.deploy = DeploySection(
-        transaction_dir=_path(de.get("transaction_dir", "/var/lib/hostfront-manager/transactions")),
+        transaction_dir=_path(
+            de.get("transaction_dir", "/var/lib/hostfront-manager/transactions")
+        ),
         require_api_version_prefix=str(de.get("require_api_version_prefix", "3.2.")),
         allow_mutations=bool(de.get("allow_mutations", False)),
         health_timeout_seconds=int(de.get("health_timeout_seconds", 20)),
         automatic_rollback=bool(de.get("automatic_rollback", False)),
-        require_verified_rollback_shape=bool(de.get("require_verified_rollback_shape", True)),
+        require_verified_rollback_shape=bool(
+            de.get("require_verified_rollback_shape", True)
+        ),
     )
     if cfg.deploy.health_timeout_seconds < 1:
         raise ConfigError("deploy.health_timeout_seconds должен быть >= 1")
 
     wa = raw.get("watchdog", {})
+    expected_tcp_ports = [int(x) for x in wa.get("expected_tcp_ports", [])]
+    expected_udp_ports = [int(x) for x in wa.get("expected_udp_ports", [])]
+    if any(p < 1 or p > 65535 for p in expected_tcp_ports + expected_udp_ports):
+        raise ConfigError("watchdog expected_*_ports содержит недопустимый порт")
     cfg.watchdog = WatchdogSection(
         enabled=bool(wa.get("enabled", False)),
-        state_file=_path(wa.get("state_file", "/var/lib/hostfront-manager/watchdog-state.json")),
+        state_file=_path(
+            wa.get("state_file", "/var/lib/hostfront-manager/watchdog-state.json")
+        ),
         interval_seconds=int(wa.get("interval_seconds", 60)),
         failure_threshold=int(wa.get("failure_threshold", 3)),
         recovery_threshold=int(wa.get("recovery_threshold", 2)),
@@ -258,11 +274,22 @@ def load_config(path: Path | None) -> AppConfig:
         max_repairs_per_window=int(wa.get("max_repairs_per_window", 3)),
         auto_repair=bool(wa.get("auto_repair", False)),
         unattended_repair=bool(wa.get("unattended_repair", False)),
-        allowed_services=[str(x) for x in wa.get("allowed_services", ["docker", "remnawave"])],
+        allowed_services=[
+            str(x) for x in wa.get("allowed_services", ["docker", "remnawave"])
+        ],
+        expected_tcp_ports=expected_tcp_ports,
+        expected_udp_ports=expected_udp_ports,
     )
-    if min(cfg.watchdog.interval_seconds, cfg.watchdog.failure_threshold,
-           cfg.watchdog.recovery_threshold, cfg.watchdog.repair_window_seconds,
-           cfg.watchdog.max_repairs_per_window) < 1:
+    if (
+        min(
+            cfg.watchdog.interval_seconds,
+            cfg.watchdog.failure_threshold,
+            cfg.watchdog.recovery_threshold,
+            cfg.watchdog.repair_window_seconds,
+            cfg.watchdog.max_repairs_per_window,
+        )
+        < 1
+    ):
         raise ConfigError("Положительные watchdog-параметры должны быть >= 1")
     if cfg.watchdog.cooldown_seconds < 0:
         raise ConfigError("watchdog.cooldown_seconds должен быть >= 0")
@@ -275,9 +302,15 @@ def load_config(path: Path | None) -> AppConfig:
         bind=str(we.get("bind", "127.0.0.1")),
         port=int(we.get("port", 8765)),
         admin_token_env=str(we.get("admin_token_env", "HOSTFRONT_ADMIN_TOKEN")),
-        telemetry_db=_path(we.get("telemetry_db", "/var/lib/hostfront-manager/telemetry.sqlite3")),
-        telemetry_key_prefix=str(we.get("telemetry_key_prefix", "HOSTFRONT_TELEMETRY_KEY_")),
-        telemetry_max_clock_skew_seconds=int(we.get("telemetry_max_clock_skew_seconds", 300)),
+        telemetry_db=_path(
+            we.get("telemetry_db", "/var/lib/hostfront-manager/telemetry.sqlite3")
+        ),
+        telemetry_key_prefix=str(
+            we.get("telemetry_key_prefix", "HOSTFRONT_TELEMETRY_KEY_")
+        ),
+        telemetry_max_clock_skew_seconds=int(
+            we.get("telemetry_max_clock_skew_seconds", 300)
+        ),
         telemetry_retention_days=int(we.get("telemetry_retention_days", 30)),
         trusted_proxy=bool(we.get("trusted_proxy", False)),
     )
@@ -293,6 +326,10 @@ def load_config(path: Path | None) -> AppConfig:
 
 def load_secrets_environment(path: Path) -> None:
     if not path.exists():
+        return
+    # systemd may have already loaded EnvironmentFile before dropping web-user
+    # privileges; the unprivileged process must not need to read the secret file.
+    if not os.access(path, os.R_OK):
         return
     try:
         lines = path.read_text(encoding="utf-8").splitlines()

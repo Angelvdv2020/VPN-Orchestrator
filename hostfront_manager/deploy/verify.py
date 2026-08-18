@@ -28,6 +28,9 @@ ROLLBACK_KINDS = {
 def verify_panel_after_apply(
     client: RemnawaveClient,
     expected_inbound_tags: list[str],
+    *,
+    expected_role_nodes: dict[str, str] | None = None,
+    role_inbound_tags: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     health = None
     health_error = None
@@ -115,6 +118,37 @@ def verify_panel_after_apply(
         tag for tag, uuid in tag_to_uuid.items() if uuid not in covered
     )
 
+    role_results: dict[str, Any] = {}
+    role_ok = True
+    for role, node_uuid in (expected_role_nodes or {}).items():
+        wanted_tags = set((role_inbound_tags or {}).get(role, []))
+        node = next(
+            (row for row in node_rows if str(row.get("uuid")) == str(node_uuid)),
+            None,
+        )
+        active = set()
+        if isinstance(node, dict):
+            profile = node.get("configProfile")
+            if isinstance(profile, dict):
+                active = {
+                    str(x.get("uuid")) if isinstance(x, dict) else str(x)
+                    for x in profile.get("activeInbounds", [])
+                }
+        expected_uuids_for_role = {
+            tag_to_uuid[tag] for tag in wanted_tags if tag in tag_to_uuid
+        }
+        unexpected = active - expected_uuids_for_role
+        missing = expected_uuids_for_role - active
+        role_results[role] = {
+            "node_uuid": node_uuid,
+            "missing_tags": sorted(
+                tag for tag in wanted_tags if tag_to_uuid.get(tag) in missing
+            ),
+            "unexpected_inbound_uuids": sorted(unexpected),
+            "node_found": node is not None,
+        }
+        role_ok = role_ok and node is not None and not missing and not unexpected
+
     ok = (
         health_error is None
         and selected is not None
@@ -123,6 +157,7 @@ def verify_panel_after_apply(
         and squad_complete
         and bool(connected)
         and not missing_node_coverage
+        and role_ok
     )
     return {
         "ok": ok,
@@ -134,6 +169,7 @@ def verify_panel_after_apply(
         "squad_complete": squad_complete,
         "connected_nodes": len(connected),
         "missing_node_coverage": missing_node_coverage,
+        "role_checks": role_results,
         "nodes_present": bool(node_rows),
     }
 

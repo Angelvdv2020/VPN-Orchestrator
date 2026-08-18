@@ -10,7 +10,9 @@ class ServiceFiles:
     web: str
 
 
-def render_services(executable: str, config_path: Path, environment_file: Path) -> ServiceFiles:
+def render_services(
+    executable: str, config_path: Path, environment_file: Path
+) -> ServiceFiles:
     common = f"""[Unit]
 After=network-online.target
 Wants=network-online.target
@@ -27,11 +29,20 @@ ReadWritePaths=/var/lib/hostfront-manager /var/log/hostfront-manager /var/backup
 Restart=on-failure
 RestartSec=10s
 """
-    watchdog = "[Unit]\nDescription=HostFront Manager Watchdog\n" + common.split("[Unit]\n", 1)[1] + (
-        f"ExecStart={executable} --config {config_path} watchdog-run\n\n[Install]\nWantedBy=multi-user.target\n"
+    watchdog = (
+        "[Unit]\nDescription=HostFront Manager Watchdog\n"
+        + common.split("[Unit]\n", 1)[1]
+        + (
+            f"ExecStart={executable} --config {config_path} watchdog-run\n\n[Install]\nWantedBy=multi-user.target\n"
+        )
     )
-    web = "[Unit]\nDescription=HostFront Manager Web API\n" + common.split("[Unit]\n", 1)[1] + (
-        f"ExecStart={executable} --config {config_path} web-serve\n\n[Install]\nWantedBy=multi-user.target\n"
+    web_common = common.replace("User=root", "User=hostfront-manager")
+    web = (
+        "[Unit]\nDescription=HostFront Manager Web API\n"
+        + web_common.split("[Unit]\n", 1)[1]
+        + (
+            f"ExecStart={executable} --config {config_path} web-serve\n\n[Install]\nWantedBy=multi-user.target\n"
+        )
     )
     return ServiceFiles(watchdog=watchdog, web=web)
 

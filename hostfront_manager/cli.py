@@ -190,6 +190,13 @@ def build_parser() -> argparse.ArgumentParser:
     da = sub.add_parser("deploy-mobile-apply")
     da.add_argument("bundle", type=Path)
     da.add_argument("--yes", action="store_true")
+    da.add_argument(
+        "--force-without-rollback",
+        action="store_true",
+        help="разрешить apply при неполном snapshot (опасно)",
+    )
+    da.add_argument("--edge-node-uuid")
+    da.add_argument("--front-node-uuid")
 
     sub.add_parser("transactions")
 
@@ -978,7 +985,12 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             },
         )
         journal.write_json(tx.path / "capabilities.json", caps.to_dict())
-        snapshot = capture_panel_snapshot(client, journal, tx)
+        snapshot = capture_panel_snapshot(
+            client,
+            journal,
+            tx,
+            force_without_rollback=bool(getattr(args, "force_without_rollback", False)),
+        )
         plan = build_deploy_plan(bundle, snapshot)
         journal.write_json(tx.path / "plan.json", plan.to_dict())
 
@@ -1024,6 +1036,19 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             verification = verify_panel_after_apply(
                 client,
                 expected_inbound_tags=list(bundle.inbound_map),
+                expected_role_nodes={
+                    role: node_uuid
+                    for role, node_uuid in (
+                        ("edge", getattr(args, "edge_node_uuid", None)),
+                        ("front", getattr(args, "front_node_uuid", None)),
+                    )
+                    if node_uuid
+                },
+                role_inbound_tags={
+                    role: list(data.get("enable_inbounds", []))
+                    for role, data in bundle.node_roles.items()
+                    if isinstance(data, dict)
+                },
             )
             journal.write_json(tx.path / "verify.json", verification)
 
