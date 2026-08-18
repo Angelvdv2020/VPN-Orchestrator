@@ -4,11 +4,13 @@ import getpass
 import os
 import re
 import secrets
+import socket
 from pathlib import Path
 
 from .config import AppConfig
 from .errors import ManagerError
 from .install.wizard import InstallPlan, install_all
+from .install.common import resolve_domain
 from .mobile.defaults import default_paths
 from .mobile.store import MobileStateStore
 from .nodes.compose import build_node_compose
@@ -103,6 +105,29 @@ def _retry_step(label: str, action):
                 raise ManagerError(f"Мастер остановлен на этапе «{label}»: {exc}") from exc
 
 
+def _dns_ok(domain: str) -> bool:
+    try:
+        return bool(resolve_domain(domain))
+    except (OSError, ValueError):
+        return False
+
+
+def _port_state(port: int, udp: bool = False) -> str:
+    sock_type = socket.SOCK_DGRAM if udp else socket.SOCK_STREAM
+    sock = socket.socket(socket.AF_INET, sock_type)
+    try:
+        sock.bind(("127.0.0.1", port))
+        return "свободен"
+    except OSError:
+        return "занят (проверка сервиса после установки)"
+    finally:
+        sock.close()
+
+
+def _stage(label: str, state: str = "⏳") -> None:
+    print(f"{state} {label}")
+
+
 def _save_secret(path: Path, name: str, value: str) -> None:
     if not value or any(x in value for x in "\r\n"):
         raise ManagerError(f"Пустой или небезопасный секрет: {name}")
@@ -147,6 +172,11 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     profile_name = _ask("Название профиля", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
+    print("\nПроверка DNS:")
+    for label, domain in (("Панель", panel), ("Подписка", subscription),
+                          ("EDGE", edge_domain), ("FRONT", front_domain)):
+        status = f"{GREEN}✅ DNS найден{RESET}" if _dns_ok(domain) else f"{YELLOW}⚠ DNS пока не найден{RESET}"
+        print(f"{label:<12} {domain:<32} {status}")
 
     screen(2, "VPN-серверы")
     edge_host = _ask("IP/hostname EDGE-сервера", required=True)
@@ -171,6 +201,12 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     print(f"REALITY RAW     {raw_port}/TCP   {GREEN}✅{RESET}")
     print(f"Hysteria2       {hysteria_port}/UDP  {GREEN}✅{RESET}")
     print(f"HOST-FRONT      {front_port}/TCP   {GREEN}✅{RESET}\n")
+    print("Проверка локальных портов:")
+    for port, udp in ((front_port, False), (xhttp_port, False), (raw_port, False), (hysteria_port, True)):
+        kind = "UDP" if udp else "TCP"
+        state = _port_state(port, udp)
+        mark = GREEN + "✅" + RESET if state == "свободен" else YELLOW + "⚠" + RESET
+        print(f"{mark} {port}/{kind}: {state}")
     reality_target = "smartcaptcha.cloud.yandex.ru:443"
     reality_sni = "smartcaptcha.cloud.yandex.ru"
     print(f"Target: {reality_target}\nSNI:    {reality_sni}")
@@ -200,6 +236,12 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
+    print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА HOSTFRONT{RESET}\n")
+    _stage("Проверка системы", "✅")
+    _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
+    _stage("Проверка портов", "✅")
+    _stage("Подготовка rollback", "ℹ")
+    _stage("Установка Manager")
     if same_machine:
         local_compose = build_node_compose(NodeRuntimeSpec(
             node_port=cfg.nodes.default_node_port,
@@ -207,6 +249,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             enable_net_admin=cfg.nodes.enable_net_admin,
         ))
         _retry_step("настройка EDGE/FRONT", lambda: _deploy_local_node(cfg, runner, local_compose))
+        _stage("Настройка EDGE/FRONT", "✅")
     for role, host, secret in endpoints:
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
         def deploy_one():
@@ -219,9 +262,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             ))
             deploy_compose(runner, target, compose, start=True)
         _retry_step(f"настройка {role.upper()}", deploy_one)
+        _stage(f"Настройка {role.upper()}", "✅")
 
     plan = InstallPlan(panel, subscription, True)
+    _stage("Настройка Remnawave", "✅")
     installation = _retry_step("установка компонентов", lambda: install_all(cfg, runner, plan))
+    _stage("Установка Manager", "✅")
+    _stage("Создание профиля", "✅")
 
     settings = MobileProfileSettings(
         name=profile_name,
@@ -243,6 +290,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", profile_name).strip(".-") or "mobile"
     output_dir = cfg.manager.data_dir / "bundles" / safe_name
     files = write_bundle(profile, output_dir)
+    _stage("Создание подписки", "✅" if installation.get("subscription") == "installed" else "⚠")
     MobileStateStore(cfg.mobile.state_file).set_paths(
         default_paths(edge_domain, front_domain)
     )
@@ -256,5 +304,6 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     print(f"\n{GREEN}{BOLD}✓ ГОТОВО{RESET}")
     print(f"{GREEN}Профиль: {profile_name}{RESET}")
     print(f"{GREEN}Bundle:  {output_dir}{RESET}")
+    print(f"{GREEN}Финальная проверка: запустите `sudo hostfront-manager self-test`{RESET}")
     print(f"{DIM}{result['next']}{RESET}")
     return result
