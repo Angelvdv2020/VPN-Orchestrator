@@ -3,6 +3,7 @@ from __future__ import annotations
 import getpass
 import os
 import re
+import socket
 from pathlib import Path
 
 from .config import AppConfig
@@ -79,6 +80,16 @@ def _save_secret(path: Path, name: str, value: str) -> None:
     atomic_write(path, "\n".join(result) + "\n", 0o600)
 
 
+def _deploy_local_node(cfg: AppConfig, runner: ShellRunner, compose: str) -> None:
+    node_dir = cfg.install.node_dir
+    node_dir.mkdir(parents=True, exist_ok=True)
+    compose_path = node_dir / "docker-compose.yml"
+    from .install.common import atomic_write
+
+    atomic_write(compose_path, compose, 0o600)
+    runner.run(["docker", "compose", "-f", str(compose_path), "up", "-d"])
+
+
 def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     """Interactive setup that gathers user data once and runs supported steps."""
     _banner()
@@ -97,17 +108,34 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     _section(2, "Доступ к нодам")
     edge_host = _ask("IP/hostname edge-сервера", default="203.0.113.11")
     front_host = _ask("IP/hostname front-сервера", default="203.0.113.12")
-    ssh_user = _ask("SSH user для нод", default="root")
-    ssh_port = int(_ask("SSH port для нод", default="22"))
-    identity = _ask("Путь к SSH private key", default="/root/.ssh/hostfront-edge")
     edge_node_secret = _ask("Node Secret edge", secret=True)
     front_node_secret = _ask("Node Secret front", secret=True)
 
+    local_ips = {"127.0.0.1", socket.gethostbyname(socket.gethostname())}
+    same_machine = edge_host in local_ips and front_host in local_ips
     endpoints = (
         ("edge", edge_host, edge_node_secret),
         ("front", front_host, front_node_secret),
     )
-    if edge_host == front_host:
+    if same_machine:
+        print(
+            f"{YELLOW}Edge и front находятся на этом же сервере; SSH не нужен, "
+            "нода будет запущена локально.{RESET}"
+        )
+        local_compose = build_node_compose(
+            NodeRuntimeSpec(
+                node_port=cfg.nodes.default_node_port,
+                secret_key=edge_node_secret,
+                enable_net_admin=cfg.nodes.enable_net_admin,
+            )
+        )
+        _deploy_local_node(cfg, runner, local_compose)
+        endpoints = ()
+    else:
+        ssh_user = _ask("SSH user для нод", default="root")
+        ssh_port = int(_ask("SSH port для нод", default="22"))
+        identity = _ask("Путь к SSH private key", default="/root/.ssh/hostfront-edge")
+    if not same_machine and edge_host == front_host:
         print(
             f"{YELLOW}Одна машина указана для edge и front; SSH-развёртывание "
             "ноды выполняется один раз после настройки портов.{RESET}"
