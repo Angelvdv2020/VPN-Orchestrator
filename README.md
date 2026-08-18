@@ -464,9 +464,6 @@ sudo hostfront-manager remnawave-capabilities
 
 ```caddyfile
 https://front.example.com {
-    encode
-    log
-
     @mobile path /edge*
     handle @mobile {
         reverse_proxy 172.18.0.1:9443 {
@@ -494,6 +491,11 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 Запрос к корню домена нормально получает 404. XHTTP создаёт динамические URL
 `/edge/<session>`; POST-запросы к ним должны получать HTTP 200.
+
+Не включайте `encode` для HOST-FRONT: XHTTP уже переносит зашифрованные данные,
+а gzip для `text/event-stream` добавляет нагрузку, задержки и нестабильность на
+мобильных сетях. Подробный access-log также лучше включать только на время
+диагностики.
 
 ### 8. Вход в веб-панель Manager
 
