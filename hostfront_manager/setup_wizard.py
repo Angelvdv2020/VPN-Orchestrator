@@ -245,13 +245,40 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     screen(1, "Домены и название")
     print(f"{GREEN}Мастер сам подготовит ORCHESTRATOR, ноды, профиль и админ-панель.{RESET}")
-    print(f"{DIM}Enter — продолжить, Q — выйти.{RESET}")
+    print(f"{DIM}Enter — простой режим. Для выборочной установки используйте расширенный режим.{RESET}")
+    mode = _ask("Режим установки: 1 — простой, 2 — расширенный", default="1")
+    advanced = mode == "2"
     panel = _ask("Домен панели", default="panel.example.com")
     subscription = _ask("Домен подписки", default="sub.example.com")
     admin_domain = _ask("Домен веб-админки", default="admin.example.com")
     profile_name = _ask("Название профиля", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
+    install_admin = True
+    install_subscription = True
+    install_nodes = True
+    if advanced:
+        screen(1, "Расширенный режим")
+        print("Выберите, что установить. Panel устанавливается всегда как основа системы.")
+        print("  1. Полная установка (рекомендуется)")
+        print("  2. Только выбранные компоненты")
+        print("  3. Удалить ранее созданный bundle профиля")
+        action = _ask("Действие", default="1")
+        if action == "3":
+            candidate = cfg.manager.data_dir / "bundles"
+            if candidate.exists():
+                print(f"\nНайден каталог bundle: {candidate}")
+                if _ask("Введите УДАЛИТЬ для подтверждения", required=True) == "УДАЛИТЬ":
+                    for child in candidate.iterdir():
+                        if child.is_dir():
+                            shutil.rmtree(child)
+                    print(f"{GREEN}✓ Bundle удалены. Установка отменена.{RESET}")
+                    return {"removed": True, "bundle_dir": str(candidate)}
+            raise ManagerError("Удаление отменено пользователем")
+        if action == "2":
+            install_admin = _ask("Установить веб-админку? 1 — да, 0 — нет", default="1") != "0"
+            install_subscription = _ask("Установить страницу подписки? 1 — да, 0 — нет", default="1") != "0"
+            install_nodes = _ask("Установить EDGE/FRONT-ноды? 1 — да, 0 — нет", default="1") != "0"
     print("\nПроверка DNS:")
     for label, domain in (("Панель", panel), ("Подписка", subscription),
                           ("EDGE", edge_domain), ("FRONT", front_domain)):
@@ -265,7 +292,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     edge_node_secret = secrets.token_hex(32)
     front_node_secret = secrets.token_hex(32)
     print(f"\n{GREEN}✓ Node Secret сгенерированы автоматически{RESET}")
-    if same_machine:
+    if same_machine and install_nodes:
         print(f"{DIM}Используется один сервер для EDGE и FRONT; SSH не потребуется.{RESET}")
         ssh_user, ssh_port, identity = "root", 22, ""
         endpoints = ()
@@ -328,7 +355,8 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     print(f"{GREEN}✓ Токен принят и будет сохранён защищённо{RESET}")
 
     screen(5, "Проверка настроек")
-    print(f"Панель:       {panel}\nПодписка:     {subscription}\nАдминка:      {admin_domain}")
+    print(f"Панель:       {panel}\nПодписка:     {subscription if install_subscription else 'не устанавливается'}")
+    print(f"Админка:      {admin_domain if install_admin else 'не устанавливается'}")
     print(f"EDGE:         {edge_host} ({edge_domain})\nFRONT:        {front_host} ({front_domain})")
     print("\nПодключения:  ✅ REALITY XHTTP  ✅ REALITY RAW  ✅ Hysteria2  ✅ HOST-FRONT")
     print(f"Порты:        {xhttp_port}, {raw_port}, {hysteria_port}, {front_port}")
@@ -365,7 +393,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             ),
         )
         _stage("Настройка EDGE/FRONT", "✅")
-    for role, host, secret in endpoints:
+    for role, host, secret in endpoints if install_nodes else ():
         target = RemoteTarget(host, ssh_user, ssh_port, identity)
         def deploy_one():
             ssh_test(runner, target)
@@ -384,7 +412,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         )
         _stage(f"Настройка {role.upper()}", "✅")
 
-    plan = InstallPlan(panel, subscription, True, admin_domain=admin_domain)
+    plan = InstallPlan(
+        panel,
+        subscription,
+        install_subscription,
+        admin_domain=admin_domain,
+        install_admin=install_admin,
+    )
     _stage("Настройка Remnawave, профиля и веб-админки", "⏳")
     installation = _retry_step(
         "установка компонентов",
