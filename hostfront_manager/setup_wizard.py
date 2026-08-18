@@ -8,6 +8,7 @@ import socket
 from pathlib import Path
 
 from .config import AppConfig
+from .backup import create_backup
 from .errors import ManagerError
 from .install.wizard import InstallPlan, install_all
 from .install.common import resolve_domain
@@ -128,6 +129,13 @@ def _stage(label: str, state: str = "⏳") -> None:
     print(f"{state} {label}")
 
 
+def _initial_backup(cfg: AppConfig):
+    """Create a backup when an existing installation has data to preserve."""
+    if not any(path.exists() for path in cfg.backup.paths):
+        return None
+    return create_backup(cfg, label="first-run")
+
+
 def _save_secret(path: Path, name: str, value: str) -> None:
     if not value or any(x in value for x in "\r\n"):
         raise ManagerError(f"Пустой или небезопасный секрет: {name}")
@@ -207,8 +215,18 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         state = _port_state(port, udp)
         mark = GREEN + "✅" + RESET if state == "свободен" else YELLOW + "⚠" + RESET
         print(f"{mark} {port}/{kind}: {state}")
+    port_mode = _ask("1 — использовать рекомендуемые настройки, 2 — изменить вручную", default="1")
+    if port_mode == "2":
+        xhttp_port = _ask_int("REALITY XHTTP", default=xhttp_port)
+        raw_port = _ask_int("REALITY RAW", default=raw_port)
+        hysteria_port = _ask_int("Hysteria2 UDP", default=hysteria_port)
+        front_port = _ask_int("HOST-FRONT", default=front_port)
     reality_target = "smartcaptcha.cloud.yandex.ru:443"
     reality_sni = "smartcaptcha.cloud.yandex.ru"
+    reality_mode = _ask("1 — использовать рекомендуемый Yandex target, 2 — изменить вручную", default="1")
+    if reality_mode == "2":
+        reality_target = _ask("REALITY target host:port", required=True)
+        reality_sni = _ask("REALITY SNI", required=True)
     print(f"Target: {reality_target}\nSNI:    {reality_sni}")
     print(f"{DIM}Ключи и технические секреты будут сгенерированы и сохранены автоматически.{RESET}")
     try:
@@ -240,7 +258,11 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     _stage("Проверка системы", "✅")
     _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
     _stage("Проверка портов", "✅")
-    _stage("Подготовка rollback", "ℹ")
+    backup_path = _retry_step("создание backup перед изменениями", lambda: _initial_backup(cfg))
+    _stage(
+        f"Backup создан: {backup_path.name}" if backup_path else "Новая установка, backup до изменений не требуется",
+        "✅" if backup_path else "ℹ",
+    )
     _stage("Установка Manager")
     if same_machine:
         local_compose = build_node_compose(NodeRuntimeSpec(
