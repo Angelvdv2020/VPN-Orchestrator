@@ -158,6 +158,29 @@ def _run_with_progress(label: str, action, *, interval: float = 4.0):
         thread.join(timeout=0.5)
 
 
+def _after_install_menu(bundle_dir: Path, profile_name: str) -> None:
+    """Offer safe next actions without forcing another shell command."""
+    print(f"\n{CYAN}{BOLD}Что сделать дальше?{RESET}")
+    print("  1. 🩺 Запустить self-test")
+    print("  2. 💾 Создать дополнительный backup")
+    print("  3. 🗑 Удалить созданный bundle профиля")
+    print("  0. Выйти")
+    choice = input(f"{CYAN}› {RESET}").strip()
+    if choice == "1":
+        print("\nЗапустите проверку: sudo hostfront-manager self-test")
+    elif choice == "2":
+        print("\nСоздайте backup: sudo hostfront-manager backup")
+    elif choice == "3":
+        print(f"\n{YELLOW}Будет удалён только bundle профиля «{profile_name}»:{RESET}")
+        print(f"  {bundle_dir}")
+        confirm = input(f"{YELLOW}Введите УДАЛИТЬ для подтверждения: {RESET}").strip()
+        if confirm == "УДАЛИТЬ":
+            shutil.rmtree(bundle_dir, ignore_errors=False)
+            print(f"{GREEN}✓ Bundle удалён. Сервисы и панель не затронуты.{RESET}")
+        else:
+            print(f"{DIM}Удаление отменено.{RESET}")
+
+
 def _clear_screen() -> None:
     """Clear real terminals and remain usable in minimal SSH/CI sessions."""
     if os.environ.get("TERM") and shutil.which("clear"):
@@ -410,4 +433,5 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     print(f"{GREEN}Bundle:  {output_dir}{RESET}")
     print(f"{GREEN}Финальная проверка: запустите `sudo hostfront-manager self-test`{RESET}")
     print(f"{DIM}{result['next']}{RESET}")
+    _after_install_menu(output_dir, profile_name)
     return result
