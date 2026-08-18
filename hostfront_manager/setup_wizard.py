@@ -57,7 +57,7 @@ def _banner() -> None:
         "  ╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   "
     )
     print(f"{RESET}")
-    print(f"{BLUE}{BOLD}                 МАСТЕР ПЕРВОГО ЗАПУСКА · RC3{RESET}")
+    print(f"{BLUE}{BOLD}                 МАСТЕР ПЕРВОГО ЗАПУСКА{RESET}")
     print(
         f"{DIM}  Чистая установка · ваши домены · ваши названия · ваши секреты{RESET}"
     )
@@ -174,7 +174,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     def screen(step: int, title: str) -> None:
         _clear_screen()
         print(f"{CYAN}{BOLD}╔══════════════════════════════════════════════════════╗{RESET}")
-        print(f"{CYAN}{BOLD}║                  ORCHESTRATOR RC3                 ║{RESET}")
+        print(f"{CYAN}{BOLD}║                    ORCHESTRATOR                   ║{RESET}")
         print(f"{CYAN}{BOLD}║                Мастер первого запуска               ║{RESET}")
         print(f"{CYAN}{BOLD}╚══════════════════════════════════════════════════════╝{RESET}\n")
         filled = "█" * (step * 4)
