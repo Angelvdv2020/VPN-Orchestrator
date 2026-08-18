@@ -63,6 +63,10 @@ def test_transports_use_remnawave_network_field_and_hysteria_tls():
     profile = build_mobile_profile(settings())
     by_tag = {item["tag"]: item for item in profile.xray_config["inbounds"]}
     assert by_tag["MOBILE-REALITY-XHTTP"]["streamSettings"]["network"] == "xhttp"
+    assert (
+        by_tag["MOBILE-REALITY-XHTTP"]["streamSettings"]["xhttpSettings"]["mode"]
+        == "packet-up"
+    )
     hysteria = by_tag["MOBILE-HY2"]["streamSettings"]
     assert hysteria["network"] == "hysteria"
     assert hysteria["security"] == "tls"

@@ -26,10 +26,13 @@ def _reality_stream(
         },
     }
     if method == "xhttp":
-        # XHTTP is evolving quickly. Use only the minimal field we control;
-        # xray -test validation remains authoritative before apply.
+        # packet-up splits uploads into ordinary HTTP requests and is the most
+        # tolerant mode for lossy mobile paths and HTTP/DPI middleboxes.  The
+        # downlink remains streamed, while a failed upload does not pin all
+        # client traffic to one long-lived TCP request.
         stream["xhttpSettings"] = {
             "path": path or settings.xhttp_path,
+            "mode": "packet-up",
         }
     return stream
 
