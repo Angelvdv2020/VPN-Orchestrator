@@ -32,10 +32,14 @@ ADMIN_COMPOSE = """services:
       WEB_PORT: 8081
       APP_MODE: full
       BACKUP_DIR: /app/backups
+      ORCHESTRATOR_API_URL: ${ORCHESTRATOR_API_URL}
+      ORCHESTRATOR_API_TOKEN: ${ORCHESTRATOR_API_TOKEN}
     volumes:
       - ./backups:/app/backups
       - ./logs:/app/logs
     networks: [remnawave-network]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on: [remnawave-admin-db]
 
   web-frontend:
@@ -101,6 +105,8 @@ def install_remnawave_admin(
             f"WEB_CORS_ORIGINS=https://{admin_domain}",
             "EXTERNAL_API_ENABLED=false",
             "EXTERNAL_API_DOCS=false",
+            "ORCHESTRATOR_API_URL=http://host.docker.internal:8765",
+            f"ORCHESTRATOR_API_TOKEN={cfg.web.admin_token() or ''}",
             "\n",
         ]
     )
