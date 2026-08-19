@@ -33,6 +33,9 @@ class MobileProfileSettings:
     edge_domain: str
     front_domain: str
     reality: RealitySettings
+    # RAW may use a separate Reality keypair.  ``None`` keeps compatibility
+    # with bundles created before per-transport key isolation was introduced.
+    reality_raw: RealitySettings | None = None
     ingress_domains: tuple[str, ...] = ()
     reality_xhttp_port: int = 443
     reality_raw_port: int = 8443
@@ -49,6 +52,8 @@ class MobileProfileSettings:
 
     def validate(self) -> None:
         self.reality.validate()
+        if self.reality_raw is not None:
+            self.reality_raw.validate()
         for field_name in (
             "reality_xhttp_port",
             "reality_raw_port",

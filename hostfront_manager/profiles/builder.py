@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import BuiltProfile, MobileProfileSettings
+from .models import BuiltProfile, MobileProfileSettings, RealitySettings
 
 
 def _reality_stream(
@@ -10,18 +10,20 @@ def _reality_stream(
     *,
     method: str,
     path: str | None = None,
+    reality: RealitySettings | None = None,
 ) -> dict[str, Any]:
+    selected = reality or settings.reality
     stream = {
         "network": method,
         "security": "reality",
         "realitySettings": {
             "show": False,
-            "target": settings.reality.target,
+            "target": selected.target,
             "xver": 0,
-            "serverNames": [settings.reality.server_name],
-            "privateKey": settings.reality.private_key,
+            "serverNames": [selected.server_name],
+            "privateKey": selected.private_key,
             "maxTimeDiff": 0,
-            "shortIds": [settings.reality.short_id],
+            "shortIds": [selected.short_id],
         },
     }
     if method == "xhttp":
@@ -154,6 +156,7 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
         stream_settings=_reality_stream(
             settings,
             method="raw",
+            reality=settings.reality_raw,
         ),
     )
 
@@ -220,7 +223,7 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "port": settings.reality_raw_port,
             "inbound_tag": "MOBILE-REALITY-RAW",
             "network": "tcp",
-            "sni": settings.reality.server_name,
+            "sni": (settings.reality_raw or settings.reality).server_name,
             "fingerprint": "chrome",
         },
         {
@@ -325,8 +328,8 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
                 "network": "tcp",
                 "transport": "raw",
                 "security": "reality",
-                "server_name": settings.reality.server_name,
-                "short_id": settings.reality.short_id,
+                "server_name": (settings.reality_raw or settings.reality).server_name,
+                "short_id": (settings.reality_raw or settings.reality).short_id,
             },
             {
                 "id": "hysteria2",

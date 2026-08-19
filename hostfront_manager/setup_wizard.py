@@ -409,12 +409,19 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         print(f"{DIM}Перед переустановкой рекомендуется выбрать расширенный режим → полная очистка.{RESET}")
     try:
         reality_private_key, _reality_public_key = generate_reality_keypair(runner)
+        reality_raw_private_key, _reality_raw_public_key = generate_reality_keypair(runner)
         _generated_uuid, short_id, hysteria_auth = generate_basic()
+        reality_raw_short_id = secrets.token_hex(8)
         print(f"{GREEN}Private Key: •••••••••••••••••••• ✅ сохранён{RESET}")
+        print(f"{GREEN}RAW Private Key: ••••••••••••••••• ✅ сохранён{RESET}")
     except ManagerError as exc:
         print(f"{YELLOW}Автогенерация REALITY недоступна: {exc}{RESET}")
         reality_private_key = _ask("REALITY private key", secret=True, required=True)
         short_id = _ask("REALITY short ID", required=True)
+        reality_raw_private_key = _ask(
+            "REALITY RAW private key (отдельный)", secret=True, required=True
+        )
+        reality_raw_short_id = _ask("REALITY RAW short ID (отдельный)", required=True)
         hysteria_auth = _ask("Hysteria2 auth", secret=True, required=True)
 
     # The panel must exist before an API token can be created.  Bootstrap only
@@ -557,6 +564,12 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
             server_name=reality_sni,
             private_key=reality_private_key,
             short_id=short_id,
+        ),
+        reality_raw=RealitySettings(
+            target=reality_target,
+            server_name=reality_sni,
+            private_key=reality_raw_private_key,
+            short_id=reality_raw_short_id,
         ),
         reality_xhttp_port=xhttp_port,
         reality_raw_port=raw_port,

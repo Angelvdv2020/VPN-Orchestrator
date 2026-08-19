@@ -86,6 +86,24 @@ def test_reality_does_not_force_client_version():
     assert "maxClientVer" not in reality
 
 
+def test_reality_raw_can_use_independent_keypair():
+    value = settings()
+    value.reality_raw = RealitySettings(
+        target="example.org:443",
+        server_name="example.org",
+        private_key="raw_private_key_here",
+        short_id="8899aabbccddeeff",
+    )
+    profile = build_mobile_profile(value)
+    by_tag = {item["tag"]: item for item in profile.xray_config["inbounds"]}
+    xhttp_reality = by_tag["MOBILE-REALITY-XHTTP"]["streamSettings"]["realitySettings"]
+    raw_reality = by_tag["MOBILE-REALITY-RAW"]["streamSettings"]["realitySettings"]
+    assert xhttp_reality["privateKey"] != raw_reality["privateKey"]
+    assert xhttp_reality["shortIds"] != raw_reality["shortIds"]
+    hosts = {item["inbound_tag"]: item for item in profile.host_plan}
+    assert hosts["MOBILE-REALITY-RAW"]["sni"] == "example.org"
+
+
 def test_transports_use_remnawave_network_field_and_hysteria_tls():
     profile = build_mobile_profile(settings())
     by_tag = {item["tag"]: item for item in profile.xray_config["inbounds"]}

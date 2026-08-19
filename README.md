@@ -368,6 +368,8 @@ hostfront-manager mobile-profile-build \
   --reality-server-name smartcaptcha.cloud.yandex.ru \
   --reality-private-key PRIVATE_KEY \
   --short-id 0011223344556677 \
+  --reality-raw-private-key RAW_PRIVATE_KEY \
+  --raw-short-id 8899aabbccddeeff \
   --hysteria-auth LONG_RANDOM_SECRET \
   --output-dir ./mobile-bundle \
   --validate
@@ -626,6 +628,8 @@ hostfront-manager mobile-profile-build \
   --reality-server-name smartcaptcha.cloud.yandex.ru \
   --reality-private-key PRIVATE_KEY \
   --short-id 0011223344556677 \
+  --reality-raw-private-key RAW_PRIVATE_KEY \
+  --raw-short-id 8899aabbccddeeff \
   --hysteria-auth LONG_RANDOM_SECRET \
   --output-dir ./mobile-bundle \
   --validate

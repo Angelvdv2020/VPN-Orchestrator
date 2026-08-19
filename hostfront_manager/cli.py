@@ -175,6 +175,14 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--reality-server-name", required=True)
     pb.add_argument("--reality-private-key", required=True)
     pb.add_argument("--short-id", required=True)
+    pb.add_argument(
+        "--reality-raw-private-key",
+        help="отдельный REALITY private key для RAW (по умолчанию ключ XHTTP для совместимости)",
+    )
+    pb.add_argument(
+        "--raw-short-id",
+        help="отдельный REALITY short ID для RAW (по умолчанию short ID XHTTP для совместимости)",
+    )
     pb.add_argument("--hysteria-auth", required=True)
     pb.add_argument("--output-dir", type=Path, required=True)
     pb.add_argument("--xhttp-path", default="/mobile")
@@ -904,6 +912,12 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
                 server_name=args.reality_server_name,
                 private_key=args.reality_private_key,
                 short_id=args.short_id,
+            ),
+            reality_raw=RealitySettings(
+                target=args.reality_target,
+                server_name=args.reality_server_name,
+                private_key=args.reality_raw_private_key or args.reality_private_key,
+                short_id=args.raw_short_id or args.short_id,
             ),
             reality_xhttp_port=args.reality_xhttp_port,
             reality_raw_port=args.reality_raw_port,
