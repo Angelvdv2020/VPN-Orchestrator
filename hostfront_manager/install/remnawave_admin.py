@@ -43,6 +43,8 @@ ADMIN_COMPOSE = """services:
     container_name: remnawave-web-frontend
     restart: unless-stopped
     env_file: [.env]
+    volumes:
+      - ./logs:/app/logs
     networks: [remnawave-network]
     depends_on: [web-backend]
 
