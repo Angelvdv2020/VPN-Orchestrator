@@ -105,7 +105,7 @@ def install_remnawave_admin(
             f"WEB_CORS_ORIGINS=https://{admin_domain}",
             "EXTERNAL_API_ENABLED=false",
             "EXTERNAL_API_DOCS=false",
-            "ORCHESTRATOR_API_URL=http://host.docker.internal:8765",
+            "ORCHESTRATOR_API_URL=http://172.18.0.1:8765",
             f"ORCHESTRATOR_API_TOKEN={cfg.web.admin_token() or ''}",
             "\n",
         ]
