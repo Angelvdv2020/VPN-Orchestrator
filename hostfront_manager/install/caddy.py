@@ -90,7 +90,15 @@ def install_caddy(
     runner.run(["docker", "compose", "-f", str(caddy_dir / "docker-compose.yml"), "config", "-q"])
     if start:
         runner.run(
-            ["docker", "compose", "-f", str(caddy_dir / "docker-compose.yml"), "up", "-d"],
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(caddy_dir / "docker-compose.yml"),
+                "up",
+                "-d",
+                "--force-recreate",
+            ],
             timeout=max(600, cfg.manager.command_timeout_seconds),
         )
         runner.run(

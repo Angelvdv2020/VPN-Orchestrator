@@ -30,6 +30,7 @@ for compose in \
   /opt/remnawave/docker-compose.yml \
   /opt/remnawave/subscription/docker-compose.yml \
   /opt/remnawave/remnawave-admin/docker-compose.yml \
+  /opt/remnawave/caddy/docker-compose.yml \
   /opt/remnanode/docker-compose.yml; do
   if [[ -f "$compose" ]]; then
     docker compose -f "$compose" down --remove-orphans --volumes 2>/dev/null || true
