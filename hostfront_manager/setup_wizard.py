@@ -462,6 +462,19 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
 
     _save_secret(cfg.manager.secrets_file, cfg.remnawave.token_env, token)
     os.environ[cfg.remnawave.token_env] = token
+    if not runner.dry_run:
+        # install.sh starts the services before the wizard receives the API
+        # token; reload them so systemd imports the newly saved secrets.env.
+        runner.run(["systemctl", "daemon-reload"], check=False)
+        runner.run(
+            [
+                "systemctl",
+                "restart",
+                "hostfront-manager-web.service",
+                "hostfront-manager-watchdog.service",
+            ],
+            check=False,
+        )
     print(f"\n{CYAN}{BOLD}🚀 УСТАНОВКА ORCHESTRATOR{RESET}\n")
     _stage("Проверка системы", "✅")
     _stage("Проверка DNS", "✅" if _dns_ok(panel) else "⚠")
