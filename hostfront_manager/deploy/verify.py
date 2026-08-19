@@ -149,6 +149,11 @@ def verify_panel_after_apply(
         }
         role_ok = role_ok and node is not None and not missing and not unexpected
 
+    # A profile/host/squad deployment may intentionally omit node role UUIDs;
+    # role assignment is a separate explicit operation. Do not report a false
+    # post-check failure merely because that optional phase was not requested.
+    node_coverage_ok = True if not expected_role_nodes else not missing_node_coverage
+
     ok = (
         health_error is None
         and selected is not None
@@ -156,7 +161,7 @@ def verify_panel_after_apply(
         and not missing_host_bindings
         and squad_complete
         and bool(connected)
-        and not missing_node_coverage
+        and node_coverage_ok
         and role_ok
     )
     return {
