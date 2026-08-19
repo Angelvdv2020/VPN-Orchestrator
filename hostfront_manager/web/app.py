@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from .. import __version__
+from ..backup import list_backups
 from ..config import AppConfig
 from ..errors import ManagerError
 from ..mobile.engine import recommend
@@ -37,7 +38,7 @@ class TelemetryInput(BaseModel):
 
 def create_app(cfg: AppConfig) -> FastAPI:
     app = FastAPI(
-        title="VPN Orchestrator", version=__version__, docs_url=None, redoc_url=None
+        title="ORCHESTRATOR", version=__version__, docs_url=None, redoc_url=None
     )
     store = TelemetryStore(cfg.web.telemetry_db)
 
@@ -165,6 +166,56 @@ def create_app(cfg: AppConfig) -> FastAPI:
         except ManagerError as exc:
             raise HTTPException(502, str(exc))
         return summary.to_dict()
+
+    def remnawave_client() -> RemnawaveClient:
+        token = cfg.remnawave.token()
+        if not token or not cfg.remnawave.base_url:
+            raise HTTPException(503, "Remnawave API is not configured")
+        return RemnawaveClient(
+            cfg.remnawave.base_url, token, cfg.manager.command_timeout_seconds
+        )
+
+    @app.get("/api/v1/resources/{kind}", dependencies=[Depends(require_admin)])
+    def resources(kind: Literal["nodes", "hosts", "profiles", "squads", "users"]):
+        """Return live Remnawave resources for the ORCHESTRATOR inventory views."""
+        client = remnawave_client()
+        getters = {
+            "nodes": client.get_nodes,
+            "hosts": client.get_hosts,
+            "profiles": client.get_config_profiles,
+            "squads": client.get_internal_squads,
+            "users": client.get_users,
+        }
+        try:
+            return {"kind": kind, "items": getters[kind]()}
+        except ManagerError as exc:
+            raise HTTPException(502, str(exc)) from exc
+
+    @app.get("/api/v1/system", dependencies=[Depends(require_admin)])
+    def system():
+        client = remnawave_client()
+        calls = {
+            "health": client.get_system_health,
+            "metadata": client.get_system_metadata,
+            "stats": client.get_system_stats_recap,
+        }
+        result: dict[str, object] = {}
+        for name, call in calls.items():
+            try:
+                result[name] = call()
+            except ManagerError as exc:
+                result[name] = {"ok": False, "error": str(exc)}
+        return result
+
+    @app.get("/api/v1/backups", dependencies=[Depends(require_admin)])
+    def backups():
+        return {
+            "items": [
+                {"name": path.name, "path": str(path), "size": path.stat().st_size}
+                for path in list_backups(cfg)
+                if path.is_file()
+            ]
+        }
 
     @app.get("/api/v1/telemetry/recent", dependencies=[Depends(require_admin)])
     def recent(limit: int = Query(100, ge=1, le=1000)):
