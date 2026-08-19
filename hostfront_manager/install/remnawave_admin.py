@@ -32,8 +32,6 @@ ADMIN_COMPOSE = """services:
       WEB_PORT: 8081
       APP_MODE: full
       BACKUP_DIR: /app/backups
-      ORCHESTRATOR_API_URL: ${ORCHESTRATOR_API_URL}
-      ORCHESTRATOR_API_TOKEN: ${ORCHESTRATOR_API_TOKEN}
     volumes:
       - ./backups:/app/backups
       - ./logs:/app/logs
