@@ -165,6 +165,12 @@ def build_parser() -> argparse.ArgumentParser:
     pb.add_argument("--name", default="Mobile")
     pb.add_argument("--edge-domain", required=True)
     pb.add_argument("--front-domain", required=True)
+    pb.add_argument(
+        "--ingress-domain",
+        action="append",
+        default=[],
+        help="дополнительный ingress-домен (можно указать несколько раз)",
+    )
     pb.add_argument("--reality-target", required=True)
     pb.add_argument("--reality-server-name", required=True)
     pb.add_argument("--reality-private-key", required=True)
@@ -892,6 +898,7 @@ def _dispatch(args, cfg: AppConfig, logger: logging.Logger) -> int:
             name=args.name,
             edge_domain=args.edge_domain,
             front_domain=args.front_domain,
+            ingress_domains=tuple(args.ingress_domain),
             reality=RealitySettings(
                 target=args.reality_target,
                 server_name=args.reality_server_name,

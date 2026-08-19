@@ -243,6 +243,20 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             "securityLayer": "TLS",
         },
     ]
+    for index, domain in enumerate(settings.ingress_domains, start=1):
+        host_plan.append(
+            {
+                "remark": f"{settings.name} Ingress {index}",
+                "address": domain,
+                "port": settings.host_front_external_port,
+                "inbound_tag": "MOBILE-HOST-FRONT",
+                "network": "tcp",
+                "path": settings.host_front_path,
+                "sni": domain,
+                "securityLayer": "TLS",
+                "role": "ingress",
+            }
+        )
 
     squad_plan = {
         "name": f"{settings.name}-Mobile",
@@ -269,6 +283,8 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             ),
         },
     }
+    if settings.ingress_domains:
+        node_roles["front"]["ingress_domains"] = list(settings.ingress_domains)
 
     caddy_front = f"""https://{settings.front_domain}:{settings.host_front_external_port} {{
     @mobile path {settings.host_front_path}*
@@ -333,6 +349,19 @@ def build_mobile_profile(settings: MobileProfileSettings) -> BuiltProfile:
             },
         ],
     }
+    for index, domain in enumerate(settings.ingress_domains, start=1):
+        client_metadata["paths"].append(
+            {
+                "id": f"ingress-{index}",
+                "tag": "MOBILE-HOST-FRONT",
+                "address": domain,
+                "port": settings.host_front_external_port,
+                "network": "tcp",
+                "transport": "xhttp",
+                "security": "tls-at-front-proxy",
+                "path": settings.host_front_path,
+            }
+        )
 
     return BuiltProfile(
         xray_config=config,

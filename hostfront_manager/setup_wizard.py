@@ -312,6 +312,13 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
     profile_name = _ask("Название профиля", default="Мой мобильный профиль")
     edge_domain = _ask("Домен edge-ноды", default="edge.example.com")
     front_domain = _ask("Домен front-ноды", default="front.example.com")
+    ingress_raw = _ask(
+        "Домены ingress через запятую (необязательно)",
+        default="",
+    )
+    ingress_domains = tuple(
+        sorted({x.strip().lower().rstrip(".") for x in ingress_raw.split(",") if x.strip()})
+    )
     install_admin = True
     install_subscription = True
     install_nodes = True
@@ -544,6 +551,7 @@ def run_first_run(cfg: AppConfig, runner: ShellRunner) -> dict:
         name=profile_name,
         edge_domain=edge_domain,
         front_domain=front_domain,
+        ingress_domains=ingress_domains,
         reality=RealitySettings(
             target=reality_target,
             server_name=reality_sni,

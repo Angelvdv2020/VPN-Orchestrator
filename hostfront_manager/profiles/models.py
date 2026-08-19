@@ -33,6 +33,7 @@ class MobileProfileSettings:
     edge_domain: str
     front_domain: str
     reality: RealitySettings
+    ingress_domains: tuple[str, ...] = ()
     reality_xhttp_port: int = 443
     reality_raw_port: int = 8443
     hysteria_port: int = 443

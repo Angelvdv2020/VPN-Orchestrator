@@ -33,6 +33,22 @@ def test_tags_unique():
     assert len(tags) == len(set(tags))
 
 
+def test_ingress_domains_create_front_hosts():
+    value = settings()
+    value.ingress_domains = ("ru-ingress.example.com", "ru-ingress-2.example.com")
+    profile = build_mobile_profile(value)
+    ingress = [x for x in profile.host_plan if x.get("role") == "ingress"]
+    assert [x["address"] for x in ingress] == [
+        "ru-ingress.example.com",
+        "ru-ingress-2.example.com",
+    ]
+    assert all(x["inbound_tag"] == "MOBILE-HOST-FRONT" for x in ingress)
+    assert profile.node_roles["front"]["ingress_domains"] == [
+        "ru-ingress.example.com",
+        "ru-ingress-2.example.com",
+    ]
+
+
 def test_host_front_uses_docker_bridge_by_default():
     p = build_mobile_profile(settings())
     inbound = next(
