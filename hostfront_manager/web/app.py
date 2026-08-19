@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 import time
+import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Any, Annotated, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -23,6 +24,7 @@ from ..telemetry.auth import device_secret, verify
 from ..telemetry.store import TelemetryStore
 from ..watchdog.checks import collect_signals
 from ..watchdog.store import WatchdogStore
+from .registry import load_registry, save_registry
 
 
 class TelemetryInput(BaseModel):
@@ -34,6 +36,180 @@ class TelemetryInput(BaseModel):
     country: str = Field(default="", max_length=2, pattern=r"^$|^[A-Z]{2}$")
     latency_ms: float | None = Field(default=None, ge=0, le=120000)
     detail: str = Field(default="", max_length=500)
+
+
+class RegistryInput(BaseModel):
+    mode: Literal["manager-owned", "safe-attach"] = "manager-owned"
+    locations: list[dict[str, Any]] = Field(default_factory=list, max_length=100)
+
+
+def _items(payload: Any, keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    """Unwrap the several list envelopes used by Remnawave API versions."""
+    if isinstance(payload, list):
+        return [x for x in payload if isinstance(x, dict)]
+    if not isinstance(payload, dict):
+        return []
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [x for x in value if isinstance(x, dict)]
+        if isinstance(value, dict):
+            nested = _items(value, keys)
+            if nested:
+                return nested
+    response = payload.get("response")
+    if response is not None and response is not payload:
+        return _items(response, keys)
+    return []
+
+
+def _host_transport(host: dict[str, Any], inbound: dict[str, Any] | None = None) -> str:
+    value = " ".join(
+        str(host.get(key, ""))
+        for key in ("remark", "name", "address", "path", "securityLayer")
+    ).lower()
+    source = inbound or {}
+    network = str(host.get("network") or source.get("network") or "").lower()
+    security = str(host.get("security") or source.get("security") or "").lower()
+    if "hysteria" in value or network == "hysteria":
+        return "Hysteria2"
+    if "host-front" in value or "host front" in value:
+        return "HOST-FRONT"
+    if "xhttp" in value or network in {"xhttp", "splithttp"}:
+        return "XHTTP + " + ("REALITY" if security == "reality" else "TLS")
+    return "RAW + " + ("REALITY" if security == "reality" else "TLS")
+
+
+def _guess_location(text: str) -> tuple[str, str, str]:
+    lowered = text.lower()
+    guesses = (
+        (r"france|франц", "FR", "🇫🇷", "Франция"),
+        (r"latvia|латв", "LV", "🇱🇻", "Латвия"),
+        (r"russia|росс|ru[- _]?ingress|вход", "RU", "🇷🇺", "Россия"),
+    )
+    for pattern, country, flag, name in guesses:
+        if re.search(pattern, lowered):
+            return country, flag, name
+    return "", "◈", "Без локации"
+
+
+def _orchestrator_overview(client: RemnawaveClient, cfg: AppConfig) -> dict[str, Any]:
+    payloads = {
+        "nodes": client.get_nodes(),
+        "hosts": client.get_hosts(),
+        "profiles": client.get_config_profiles(),
+        "squads": client.get_internal_squads(),
+        "users": client.get_users(),
+    }
+    nodes = _items(payloads["nodes"], ("nodes",))
+    hosts = _items(payloads["hosts"], ("hosts",))
+    profiles = _items(payloads["profiles"], ("configProfiles", "config_profiles"))
+    squads = _items(payloads["squads"], ("internalSquads", "internal_squads"))
+    users = _items(payloads["users"], ("users",))
+    inbound_index: dict[str, dict[str, Any]] = {}
+    profile_index = {str(x.get("uuid")): x for x in profiles if x.get("uuid")}
+    for profile in profiles:
+        for inbound in _items(profile.get("inbounds"), ("inbounds",)):
+            if inbound.get("uuid"):
+                inbound_index[str(inbound["uuid"])] = {
+                    **inbound,
+                    "profile_uuid": profile.get("uuid"),
+                    "profile_name": profile.get("name"),
+                }
+    host_rows: list[dict[str, Any]] = []
+    for host in hosts:
+        binding = host.get("inbound") if isinstance(host.get("inbound"), dict) else {}
+        inbound_uuid = binding.get("configProfileInboundUuid") or host.get("inboundUuid")
+        inbound = inbound_index.get(str(inbound_uuid), {})
+        profile_uuid = binding.get("configProfileUuid") or inbound.get("profile_uuid")
+        host_rows.append(
+            {
+                "uuid": host.get("uuid"),
+                "remark": host.get("remark") or host.get("name"),
+                "address": host.get("address"),
+                "port": host.get("port"),
+                "path": host.get("path"),
+                "sni": host.get("sni"),
+                "profile_uuid": profile_uuid,
+                "profile_name": profile_index.get(str(profile_uuid), {}).get("name")
+                or inbound.get("profile_name"),
+                "inbound_uuid": inbound_uuid,
+                "inbound_tag": inbound.get("tag"),
+                "network": host.get("network") or inbound.get("network"),
+                "security": host.get("security") or inbound.get("security"),
+                "transport": _host_transport(host, inbound),
+                "disabled": bool(host.get("isDisabled", host.get("disabled", False))),
+            }
+        )
+    registry = load_registry(cfg.manager.data_dir)
+    locations = registry.get("locations", [])
+    if not locations:
+        # Keep a useful first view even before the operator fills the registry.
+        # These are read-only inferred cards, never persisted as live objects.
+        for profile in profiles:
+            profile_uuid = profile.get("uuid")
+            profile_hosts = [x for x in host_rows if x.get("profile_uuid") == profile_uuid]
+            text = " ".join(
+                [str(profile.get("name", ""))]
+                + [str(x.get("remark", "")) for x in profile_hosts]
+            )
+            country, flag, name = _guess_location(text)
+            locations.append(
+                {
+                    "id": f"auto-{profile_uuid or len(locations)}",
+                    "name": profile.get("name") or name,
+                    "country": country,
+                    "flag": flag,
+                    "profile_uuid": profile_uuid,
+                    "node_uuid": "",
+                    "squad_uuid": "",
+                    "hosts": profile_hosts,
+                    "auto": True,
+                }
+            )
+    location_by_resource: dict[str, dict[str, Any]] = {}
+    for location in locations:
+        if not isinstance(location, dict):
+            continue
+        for key in ("profile_uuid", "node_uuid", "squad_uuid"):
+            if location.get(key):
+                location_by_resource[str(location[key])] = location
+    for row in host_rows:
+        location = location_by_resource.get(str(row.get("profile_uuid")))
+        row["location"] = location.get("name") if location else "Без локации"
+        row["flag"] = location.get("flag", "") if location else ""
+    diagnostics = []
+    for row in host_rows:
+        diagnostics.append(
+            {
+                "host_uuid": row.get("uuid"),
+                "name": row.get("remark") or row.get("uuid"),
+                "transport": row.get("transport"),
+                "location": row.get("location"),
+                "ok": bool(row.get("profile_uuid") and row.get("inbound_uuid")),
+                "reason": "binding ok"
+                if row.get("profile_uuid") and row.get("inbound_uuid")
+                else "host is not bound to a profile inbound",
+            }
+        )
+    return {
+        "registry": registry,
+        "mode": registry.get("mode", "manager-owned"),
+        "locations": locations,
+        "nodes": nodes,
+        "hosts": host_rows,
+        "profiles": profiles,
+        "squads": squads,
+        "users": users,
+        "diagnostics": diagnostics,
+        "counts": {
+            "nodes": len(nodes),
+            "hosts": len(host_rows),
+            "profiles": len(profiles),
+            "squads": len(squads),
+            "users": len(users),
+        },
+    }
 
 
 def create_app(cfg: AppConfig) -> FastAPI:
@@ -190,6 +366,56 @@ def create_app(cfg: AppConfig) -> FastAPI:
             return {"kind": kind, "items": getters[kind]()}
         except ManagerError as exc:
             raise HTTPException(502, str(exc)) from exc
+
+    @app.get("/api/v1/orchestrator/overview", dependencies=[Depends(require_admin)])
+    def orchestrator_overview():
+        """Return one normalized view for the location/transport admin screen."""
+        try:
+            return _orchestrator_overview(remnawave_client(), cfg)
+        except ManagerError as exc:
+            raise HTTPException(502, str(exc)) from exc
+
+    @app.get("/api/v1/orchestrator/registry", dependencies=[Depends(require_admin)])
+    def orchestrator_registry():
+        return load_registry(cfg.manager.data_dir)
+
+    @app.put("/api/v1/orchestrator/registry", dependencies=[Depends(require_admin)])
+    def update_orchestrator_registry(payload: RegistryInput):
+        """Persist only UI metadata; live Remnawave objects are never changed here."""
+        value = payload.model_dump()
+        value["updated_at"] = datetime.now(UTC).isoformat()
+        try:
+            return save_registry(cfg.manager.data_dir, value)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/api/v1/orchestrator/transport-health", dependencies=[Depends(require_admin)])
+    def orchestrator_transport_health():
+        try:
+            overview = _orchestrator_overview(remnawave_client(), cfg)
+        except ManagerError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        samples: dict[str, dict[str, Any]] = {}
+        for row in store.summary(int(time.time()) - 24 * 3600):
+            key = str(row.get("path_id", ""))
+            aggregate = samples.setdefault(key, {"up": 0, "down": 0, "unknown": 0})
+            status = str(row.get("status", "unknown"))
+            aggregate[status] = aggregate.get(status, 0) + int(row.get("samples", 0))
+            aggregate["last_seen"] = max(aggregate.get("last_seen", 0), int(row.get("last_seen", 0)))
+        result = []
+        for row in overview["diagnostics"]:
+            host_uuid = str(row.get("host_uuid") or "")
+            sample = samples.get(host_uuid) or samples.get(str(row.get("name")))
+            result.append(
+                {
+                    **row,
+                    "telemetry": sample,
+                    "state": "up"
+                    if sample and sample.get("up", 0) > sample.get("down", 0)
+                    else "unknown",
+                }
+            )
+        return {"items": result, "window_hours": 24}
 
     @app.get("/api/v1/system", dependencies=[Depends(require_admin)])
     def system():
